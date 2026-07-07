@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "project-nupchi",
+    "name": "Nupchi",
     "slug": "project-nupchi",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,7 +8,10 @@
     "scheme": "projectnupchi",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "infoPlist": {
+        "NSCameraUsageDescription": "수조 점검용 어류 사진을 촬영하기 위해 카메라 접근이 필요합니다."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -31,6 +34,12 @@
           "backgroundColor": "#208AEF",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "수조 점검용 어류 사진을 촬영하기 위해 카메라 접근이 필요합니다."
         }
       ]
     ],
