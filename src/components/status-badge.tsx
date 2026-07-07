@@ -3,10 +3,10 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Palette, Radius } from '@/constants/aqua-theme';
 import { TankStatus, statusLabel } from '@/domain/aquaculture';
 
-const colors: Record<TankStatus, { bg: string; text: string }> = {
-  normal: { bg: Palette.surfaceMuted, text: Palette.normal },
-  caution: { bg: Palette.cautionBg, text: Palette.caution },
-  suspicious: { bg: Palette.suspiciousBg, text: Palette.suspicious },
+const colors: Record<TankStatus, { bg: string; text: string; dot: string }> = {
+  normal: { bg: Palette.surfaceMuted, text: Palette.normal, dot: Palette.normal },
+  caution: { bg: Palette.cautionBg, text: Palette.caution, dot: Palette.caution },
+  suspicious: { bg: Palette.suspiciousBg, text: Palette.suspicious, dot: Palette.suspicious },
 };
 
 export function StatusBadge({ status, compact = false }: { status: TankStatus; compact?: boolean }) {
@@ -14,6 +14,7 @@ export function StatusBadge({ status, compact = false }: { status: TankStatus; c
 
   return (
     <View style={[styles.badge, { backgroundColor: color.bg }, compact && styles.compact]}>
+      <View style={[styles.dot, { backgroundColor: color.dot }]} />
       <Text selectable style={[styles.text, { color: color.text }, compact && styles.compactText]}>
         {statusLabel[status]}
       </Text>
@@ -23,8 +24,11 @@ export function StatusBadge({ status, compact = false }: { status: TankStatus; c
 
 const styles = StyleSheet.create({
   badge: {
+    alignItems: 'center',
     alignSelf: 'flex-start',
     borderRadius: Radius.pill,
+    flexDirection: 'row',
+    gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
@@ -32,9 +36,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
+  dot: {
+    borderRadius: Radius.pill,
+    height: 6,
+    width: 6,
+  },
   text: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '700',
   },
   compactText: {
     fontSize: 13,

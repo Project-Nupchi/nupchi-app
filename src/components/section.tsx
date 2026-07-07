@@ -1,7 +1,7 @@
 import { PropsWithChildren } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Palette, Radius, Space } from '@/constants/aqua-theme';
+import { Palette, Radius, Shadow, Space } from '@/constants/aqua-theme';
 
 type SectionProps = PropsWithChildren<{
   title?: string;
@@ -31,9 +31,12 @@ const styles = StyleSheet.create({
     gap: Space.sm,
   },
   title: {
-    color: Palette.text,
-    fontSize: 17,
-    fontWeight: '900',
+    color: Palette.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    marginLeft: 2,
+    textTransform: 'uppercase',
   },
   body: {
     backgroundColor: Palette.surface,
@@ -41,11 +44,13 @@ const styles = StyleSheet.create({
     borderRadius: Radius.card,
     borderWidth: 1,
     gap: Space.md,
-    padding: Space.md,
+    padding: Space.lg,
+    ...Shadow.card,
   },
   footnote: {
     color: Palette.textSubtle,
     fontSize: 13,
     lineHeight: 18,
+    marginLeft: 2,
   },
 });

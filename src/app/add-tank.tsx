@@ -99,20 +99,22 @@ const styles = StyleSheet.create({
     gap: Space.sm,
   },
   label: {
-    color: Palette.text,
-    fontSize: 15,
-    fontWeight: '900',
+    color: Palette.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    marginLeft: 2,
   },
   input: {
     backgroundColor: Palette.surface,
     borderColor: Palette.line,
-    borderRadius: Radius.card,
+    borderRadius: Radius.input,
     borderWidth: 1,
     color: Palette.text,
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '500',
     minHeight: 52,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
   },
   textArea: {
     minHeight: 110,
@@ -122,7 +124,7 @@ const styles = StyleSheet.create({
   error: {
     color: Palette.suspicious,
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   footer: {
     borderTopColor: Palette.line,

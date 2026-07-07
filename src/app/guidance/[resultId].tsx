@@ -6,7 +6,7 @@ import { ActionButton } from '@/components/action-button';
 import { ScreenShell } from '@/components/screen-shell';
 import { Section } from '@/components/section';
 import { StatusBadge } from '@/components/status-badge';
-import { Palette, Radius, Space } from '@/constants/aqua-theme';
+import { Palette, Radius, Shadow, Space } from '@/constants/aqua-theme';
 import { useAquaculture } from '@/state/aquaculture-store';
 
 const citations = [
@@ -80,7 +80,7 @@ export default function GuidanceScreen() {
               <Text selectable style={styles.kicker}>
                 {result.tankId} 대응 요약
               </Text>
-              <Text selectable style={styles.title}>
+              <Text selectable style={styles.heroTitle}>
                 {tank?.groupId ?? '수조군'} 차단 후 공식 절차 확인
               </Text>
             </View>
@@ -156,26 +156,36 @@ function Step({ index, title, body }: { index: string; title: string; body: stri
 const styles = StyleSheet.create({
   hero: {
     alignItems: 'flex-start',
-    backgroundColor: Palette.black,
+    backgroundColor: Palette.ink,
     borderRadius: Radius.card,
     flexDirection: 'row',
     gap: Space.md,
     justifyContent: 'space-between',
-    padding: Space.lg,
+    padding: Space.xl,
+    ...Shadow.raised,
   },
   heroText: {
     flex: 1,
     gap: Space.xs,
   },
   kicker: {
-    color: '#9FD8CF',
+    color: Palette.inkMint,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
+  heroTitle: {
+    color: Palette.white,
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    lineHeight: 30,
   },
   title: {
     color: Palette.text,
     fontSize: 24,
-    fontWeight: '900',
+    fontWeight: '800',
+    letterSpacing: -0.5,
     lineHeight: 30,
   },
   panel: {
@@ -185,12 +195,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: Space.md,
     padding: Space.lg,
+    ...Shadow.card,
   },
   body: {
     color: Palette.textMuted,
     fontSize: 15,
-    fontWeight: '700',
-    lineHeight: 22,
+    fontWeight: '400',
+    lineHeight: 23,
   },
   step: {
     flexDirection: 'row',
@@ -207,7 +218,7 @@ const styles = StyleSheet.create({
   stepNumberText: {
     color: Palette.accent,
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   stepText: {
     flex: 1,
@@ -216,7 +227,8 @@ const styles = StyleSheet.create({
   stepTitle: {
     color: Palette.text,
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   citation: {
     borderBottomColor: Palette.line,
@@ -227,32 +239,32 @@ const styles = StyleSheet.create({
   citationTitle: {
     color: Palette.accent,
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   citationUrl: {
-    color: Palette.textMuted,
+    color: Palette.textSubtle,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '400',
     lineHeight: 18,
   },
   notice: {
     backgroundColor: Palette.cautionBg,
-    borderColor: '#E9C078',
+    borderColor: Palette.cautionLine,
     borderRadius: Radius.card,
     borderWidth: 1,
     gap: 6,
-    padding: Space.md,
+    padding: Space.lg,
   },
   noticeTitle: {
     color: Palette.caution,
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   noticeBody: {
     color: Palette.text,
     fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 20,
+    fontWeight: '400',
+    lineHeight: 21,
   },
   pressed: {
     opacity: 0.72,

@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Palette, Radius } from '@/constants/aqua-theme';
+import { Palette, Radius, Shadow } from '@/constants/aqua-theme';
 import { InspectionResult } from '@/domain/aquaculture';
 
 export function PhotoAnalysisStage({ result }: { result: InspectionResult }) {
@@ -47,10 +47,11 @@ export function PhotoAnalysisStage({ result }: { result: InspectionResult }) {
 const styles = StyleSheet.create({
   frame: {
     aspectRatio: 4 / 3,
-    backgroundColor: Palette.black,
+    backgroundColor: Palette.ink,
     borderRadius: Radius.card,
     overflow: 'hidden',
     position: 'relative',
+    ...Shadow.card,
   },
   placeholder: {
     bottom: 0,
@@ -73,23 +74,26 @@ const styles = StyleSheet.create({
   placeholderText: {
     color: Palette.textMuted,
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   box: {
     position: 'absolute',
     borderColor: Palette.suspicious,
+    borderRadius: 4,
     borderWidth: 2,
-    backgroundColor: 'rgba(199, 55, 47, 0.12)',
+    backgroundColor: 'rgba(192, 54, 44, 0.12)',
   },
   boxLabel: {
     position: 'absolute',
     left: -2,
-    top: -25,
+    top: -26,
     backgroundColor: Palette.suspicious,
+    borderRadius: 5,
     color: Palette.white,
     fontSize: 12,
-    fontWeight: '900',
-    paddingHorizontal: 7,
+    fontWeight: '700',
+    overflow: 'hidden',
+    paddingHorizontal: 8,
     paddingVertical: 3,
   },
 });

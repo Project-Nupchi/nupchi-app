@@ -6,7 +6,7 @@ import { PhotoAnalysisStage } from '@/components/photo-analysis-stage';
 import { ScreenShell } from '@/components/screen-shell';
 import { Section } from '@/components/section';
 import { StatusBadge } from '@/components/status-badge';
-import { Palette, Radius, Space } from '@/constants/aqua-theme';
+import { Palette, Radius, Shadow, Space } from '@/constants/aqua-theme';
 import {
   formatDateTime,
   getCurrentStatus,
@@ -14,6 +14,7 @@ import {
   getTankGroupStatus,
   getTankResults,
   statusLabel,
+  TankStatus,
 } from '@/domain/aquaculture';
 import { useAquaculture } from '@/state/aquaculture-store';
 
@@ -43,6 +44,7 @@ export default function TankHistoryScreen() {
   return (
     <ScreenShell>
       <View style={styles.headerPanel}>
+        <View style={[styles.statusRail, { backgroundColor: railColors[currentStatus] }]} />
         <View style={styles.headerRow}>
           <View style={styles.headerText}>
             <Text selectable style={styles.tankId}>
@@ -172,6 +174,12 @@ function trendDotStyle(status: 'normal' | 'caution' | 'suspicious') {
   return { backgroundColor: Palette.normal };
 }
 
+const railColors: Record<TankStatus, string> = {
+  normal: 'transparent',
+  caution: Palette.caution,
+  suspicious: Palette.suspicious,
+};
+
 const styles = StyleSheet.create({
   headerPanel: {
     backgroundColor: Palette.surface,
@@ -179,7 +187,16 @@ const styles = StyleSheet.create({
     borderRadius: Radius.card,
     borderWidth: 1,
     gap: Space.lg,
+    overflow: 'hidden',
     padding: Space.lg,
+    ...Shadow.card,
+  },
+  statusRail: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    top: 0,
+    width: 4,
   },
   headerRow: {
     alignItems: 'flex-start',
@@ -194,22 +211,24 @@ const styles = StyleSheet.create({
   tankId: {
     color: Palette.text,
     fontSize: 30,
-    fontWeight: '900',
+    fontWeight: '800',
+    letterSpacing: -0.6,
   },
   stockedInfo: {
     color: Palette.textMuted,
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '400',
     lineHeight: 22,
   },
   groupId: {
     color: Palette.accent,
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   alert: {
     backgroundColor: Palette.suspiciousBg,
-    borderColor: '#F1B1AC',
+    borderColor: Palette.suspiciousLine,
     borderRadius: Radius.card,
     borderWidth: 1,
     gap: 8,
@@ -218,22 +237,23 @@ const styles = StyleSheet.create({
   alertTitle: {
     color: Palette.suspicious,
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
   alertBody: {
     color: Palette.text,
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '400',
     lineHeight: 22,
   },
   alertLink: {
     color: Palette.suspicious,
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   groupAlert: {
     backgroundColor: Palette.cautionBg,
-    borderColor: '#E9C078',
+    borderColor: Palette.cautionLine,
     borderRadius: Radius.card,
     borderWidth: 1,
     gap: 8,
@@ -242,12 +262,13 @@ const styles = StyleSheet.create({
   groupAlertTitle: {
     color: Palette.caution,
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
   groupAlertLink: {
     color: Palette.caution,
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   trendRow: {
     flexDirection: 'row',
@@ -259,14 +280,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   trendDot: {
-    height: 12,
+    height: 10,
     width: '100%',
     borderRadius: Radius.pill,
   },
   trendLabel: {
     color: Palette.textMuted,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   timelineItem: {
     borderBottomColor: Palette.line,
@@ -279,14 +300,15 @@ const styles = StyleSheet.create({
   },
   timelineDate: {
     color: Palette.text,
-    fontSize: 17,
-    fontWeight: '900',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   muted: {
     color: Palette.textMuted,
     fontSize: 14,
-    fontWeight: '600',
-    lineHeight: 20,
+    fontWeight: '400',
+    lineHeight: 21,
   },
   empty: {
     backgroundColor: Palette.surface,
@@ -295,6 +317,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: Space.md,
     padding: Space.lg,
+    ...Shadow.card,
   },
   emptyInline: {
     gap: Space.md,
@@ -302,7 +325,8 @@ const styles = StyleSheet.create({
   emptyTitle: {
     color: Palette.text,
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '800',
+    letterSpacing: -0.4,
   },
   pressed: {
     opacity: 0.8,

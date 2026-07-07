@@ -7,7 +7,7 @@ import { PhotoAnalysisStage } from '@/components/photo-analysis-stage';
 import { ScreenShell } from '@/components/screen-shell';
 import { Section } from '@/components/section';
 import { StatusBadge } from '@/components/status-badge';
-import { Palette, Radius, Space } from '@/constants/aqua-theme';
+import { Palette, Radius, Shadow, Space } from '@/constants/aqua-theme';
 import { flounderDiseaseLabels, formatDateTime, statusLabel } from '@/domain/aquaculture';
 import { useAquaculture } from '@/state/aquaculture-store';
 
@@ -82,12 +82,12 @@ export default function ResultScreen() {
 
       {result.status === 'completed' ? (
         <>
-          <View style={styles.resultHead}>
+          <View style={[styles.resultHead, gradePanels[result.grade]]}>
             <View style={styles.resultMeta}>
               <Text selectable style={styles.kicker}>
                 {tank?.id ?? result.tankId} · {tank?.groupId ?? '수조군'} · {formatDateTime(result.capturedAt)}
               </Text>
-              <Text selectable style={styles.title}>
+              <Text selectable style={[styles.title, { color: gradeTitleColors[result.grade] }]}>
                 {statusLabel[result.grade]} 등급
               </Text>
             </View>
@@ -137,6 +137,19 @@ export default function ResultScreen() {
   );
 }
 
+// 판정 등급별 헤더 패널 배경·테두리
+const gradePanels = {
+  normal: { backgroundColor: Palette.surface, borderColor: Palette.line },
+  caution: { backgroundColor: Palette.cautionBg, borderColor: Palette.cautionLine },
+  suspicious: { backgroundColor: Palette.suspiciousBg, borderColor: Palette.suspiciousLine },
+} as const;
+
+const gradeTitleColors = {
+  normal: Palette.text,
+  caution: Palette.caution,
+  suspicious: Palette.suspicious,
+} as const;
+
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.infoRow}>
@@ -159,6 +172,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: Space.md,
     padding: Space.xl,
+    ...Shadow.card,
   },
   panel: {
     backgroundColor: Palette.surface,
@@ -167,12 +181,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: Space.md,
     padding: Space.lg,
+    ...Shadow.card,
   },
   resultHead: {
     alignItems: 'flex-start',
+    borderRadius: Radius.card,
+    borderWidth: 1,
     flexDirection: 'row',
     gap: Space.md,
     justifyContent: 'space-between',
+    padding: Space.lg,
+    ...Shadow.card,
   },
   resultMeta: {
     flex: 1,
@@ -181,19 +200,20 @@ const styles = StyleSheet.create({
   kicker: {
     color: Palette.textMuted,
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   title: {
     color: Palette.text,
     fontSize: 24,
-    fontWeight: '900',
+    fontWeight: '800',
+    letterSpacing: -0.5,
     lineHeight: 30,
   },
   body: {
     color: Palette.textMuted,
     fontSize: 15,
-    fontWeight: '700',
-    lineHeight: 22,
+    fontWeight: '400',
+    lineHeight: 23,
   },
   infoRow: {
     gap: 4,
@@ -201,32 +221,33 @@ const styles = StyleSheet.create({
   infoLabel: {
     color: Palette.textSubtle,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
+    letterSpacing: 0.4,
   },
   infoValue: {
     color: Palette.text,
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
     lineHeight: 23,
   },
   notice: {
     backgroundColor: Palette.cautionBg,
-    borderColor: '#E9C078',
+    borderColor: Palette.cautionLine,
     borderRadius: Radius.card,
     borderWidth: 1,
     gap: 6,
-    padding: Space.md,
+    padding: Space.lg,
   },
   noticeTitle: {
     color: Palette.caution,
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   noticeBody: {
     color: Palette.text,
     fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 20,
+    fontWeight: '400',
+    lineHeight: 21,
   },
   bottomActions: {
     flexDirection: 'row',

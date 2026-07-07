@@ -16,6 +16,9 @@ export default function TabLayout() {
             headerLargeTitle: true,
             headerShadowVisible: false,
             headerStyle: { backgroundColor: Palette.canvas },
+            headerTintColor: Palette.accent,
+            headerTitleStyle: { color: Palette.text, fontWeight: '700' },
+            headerLargeTitleStyle: { color: Palette.text, fontWeight: '800' },
             contentStyle: { backgroundColor: Palette.canvas },
           }}
         >

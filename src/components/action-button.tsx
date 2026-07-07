@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
 
-import { Palette, Radius } from '@/constants/aqua-theme';
+import { Palette, Radius, Shadow } from '@/constants/aqua-theme';
 
 type ActionButtonProps = {
   label: string;
@@ -23,6 +23,7 @@ export function ActionButton({
   const variantStyle = styles[variant];
   const textStyle = variant === 'primary' || variant === 'danger' ? styles.textOnDark : styles.textOnLight;
   const shouldRenderSfIcon = Boolean(icon && process.env.EXPO_OS !== 'web');
+  const hasShadow = !disabled && (variant === 'primary' || variant === 'danger');
 
   return (
     <Pressable
@@ -32,6 +33,7 @@ export function ActionButton({
       style={({ pressed }) => [
         styles.button,
         variantStyle,
+        hasShadow && Shadow.card,
         disabled && styles.disabled,
         pressed && !disabled && styles.pressed,
         style,
@@ -53,9 +55,9 @@ export function ActionButton({
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 50,
+    minHeight: 52,
     borderRadius: Radius.button,
-    paddingHorizontal: 16,
+    paddingHorizontal: 18,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
@@ -65,7 +67,7 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.accent,
   },
   secondary: {
-    backgroundColor: Palette.surfaceMuted,
+    backgroundColor: Palette.surface,
     borderWidth: 1,
     borderColor: Palette.line,
   },
@@ -79,15 +81,17 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   pressed: {
+    opacity: 0.88,
     transform: [{ scale: 0.98 }],
   },
   icon: {
-    width: 18,
-    height: 18,
+    width: 17,
+    height: 17,
   },
   text: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   textOnDark: {
     color: Palette.white,

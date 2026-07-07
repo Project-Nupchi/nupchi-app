@@ -33,12 +33,13 @@ const styles = StyleSheet.create({
   title: {
     color: Palette.text,
     fontSize: 24,
-    fontWeight: '900',
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
   body: {
     color: Palette.textMuted,
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '400',
     lineHeight: 22,
   },
 });
