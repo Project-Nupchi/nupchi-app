@@ -3,18 +3,18 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Palette, Radius } from '@/constants/aqua-theme';
 import { TankStatus, statusLabel } from '@/domain/aquaculture';
 
-const colors: Record<TankStatus, { bg: string; text: string; dot: string }> = {
-  normal: { bg: Palette.surfaceMuted, text: Palette.normal, dot: Palette.normal },
-  caution: { bg: Palette.cautionBg, text: Palette.caution, dot: Palette.caution },
-  suspicious: { bg: Palette.suspiciousBg, text: Palette.suspicious, dot: Palette.suspicious },
+const colors: Record<TankStatus, { bg: string; line: string; text: string }> = {
+  normal: { bg: Palette.normalBg, line: Palette.normalLine, text: Palette.normal },
+  caution: { bg: Palette.cautionBg, line: Palette.cautionLine, text: Palette.caution },
+  suspicious: { bg: Palette.suspiciousBg, line: Palette.suspiciousLine, text: Palette.suspicious },
 };
 
 export function StatusBadge({ status, compact = false }: { status: TankStatus; compact?: boolean }) {
   const color = colors[status];
 
   return (
-    <View style={[styles.badge, { backgroundColor: color.bg }, compact && styles.compact]}>
-      <View style={[styles.dot, { backgroundColor: color.dot }]} />
+    <View style={[styles.badge, { backgroundColor: color.bg, borderColor: color.line }, compact && styles.compact]}>
+      <View style={[styles.dot, { backgroundColor: color.text }]} />
       <Text selectable style={[styles.text, { color: color.text }, compact && styles.compactText]}>
         {statusLabel[status]}
       </Text>
@@ -27,6 +27,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'flex-start',
     borderRadius: Radius.pill,
+    borderWidth: 1,
     flexDirection: 'row',
     gap: 6,
     paddingHorizontal: 12,
@@ -38,12 +39,12 @@ const styles = StyleSheet.create({
   },
   dot: {
     borderRadius: Radius.pill,
-    height: 6,
-    width: 6,
+    height: 7,
+    width: 7,
   },
   text: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   compactText: {
     fontSize: 13,

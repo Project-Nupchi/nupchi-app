@@ -7,23 +7,31 @@ type ActionButtonProps = {
   label: string;
   icon?: string;
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+  size?: 'regular' | 'compact';
   disabled?: boolean;
   style?: ViewStyle;
   onPress: () => void;
 };
 
+const textColors = {
+  primary: Palette.onPrimary,
+  secondary: Palette.text,
+  danger: Palette.white,
+  ghost: Palette.primary,
+} as const;
+
 export function ActionButton({
   label,
   icon,
   variant = 'primary',
+  size = 'regular',
   disabled = false,
   style,
   onPress,
 }: ActionButtonProps) {
-  const variantStyle = styles[variant];
-  const textStyle = variant === 'primary' || variant === 'danger' ? styles.textOnDark : styles.textOnLight;
+  const textColor = textColors[variant];
   const shouldRenderSfIcon = Boolean(icon && process.env.EXPO_OS !== 'web');
-  const hasShadow = !disabled && (variant === 'primary' || variant === 'danger');
+  const hasShadow = variant === 'primary' || variant === 'danger';
 
   return (
     <Pressable
@@ -32,21 +40,18 @@ export function ActionButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        variantStyle,
-        hasShadow && Shadow.card,
+        styles[variant],
+        hasShadow && !disabled && Shadow.card,
+        size === 'compact' && styles.compact,
         disabled && styles.disabled,
         pressed && !disabled && styles.pressed,
         style,
       ]}
     >
       {shouldRenderSfIcon ? (
-        <Image
-          source={`sf:${icon}`}
-          style={[styles.icon, { tintColor: textStyle.color }]}
-          contentFit="contain"
-        />
+        <Image source={`sf:${icon}`} style={[styles.icon, { tintColor: textColor }]} contentFit="contain" />
       ) : null}
-      <Text selectable={false} style={[styles.text, textStyle]}>
+      <Text selectable={false} style={[styles.text, size === 'compact' && styles.compactText, { color: textColor }]}>
         {label}
       </Text>
     </Pressable>
@@ -55,21 +60,25 @@ export function ActionButton({
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 52,
-    borderRadius: Radius.button,
-    paddingHorizontal: 18,
     alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: Radius.button,
     flexDirection: 'row',
     gap: 8,
+    justifyContent: 'center',
+    minHeight: 56,
+    paddingHorizontal: 20,
+  },
+  compact: {
+    minHeight: 42,
+    paddingHorizontal: 16,
   },
   primary: {
-    backgroundColor: Palette.accent,
+    backgroundColor: Palette.primary,
   },
   secondary: {
-    backgroundColor: Palette.surface,
+    backgroundColor: Palette.glassStrong,
+    borderColor: Palette.glassLine,
     borderWidth: 1,
-    borderColor: Palette.line,
   },
   danger: {
     backgroundColor: Palette.suspicious,
@@ -78,25 +87,22 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   disabled: {
-    opacity: 0.45,
+    opacity: 0.4,
   },
   pressed: {
-    opacity: 0.88,
-    transform: [{ scale: 0.98 }],
+    opacity: 0.85,
+    transform: [{ scale: 0.985 }],
   },
   icon: {
-    width: 17,
-    height: 17,
+    width: 18,
+    height: 18,
   },
   text: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
     letterSpacing: -0.2,
   },
-  textOnDark: {
-    color: Palette.white,
-  },
-  textOnLight: {
-    color: Palette.text,
+  compactText: {
+    fontSize: 15,
   },
 });

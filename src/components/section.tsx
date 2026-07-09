@@ -1,7 +1,8 @@
 import { PropsWithChildren } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Palette, Radius, Shadow, Space } from '@/constants/aqua-theme';
+import { GlassCard } from '@/components/glass-card';
+import { Palette, Space } from '@/constants/aqua-theme';
 
 type SectionProps = PropsWithChildren<{
   title?: string;
@@ -16,7 +17,7 @@ export function Section({ title, footnote, children }: SectionProps) {
           {title}
         </Text>
       ) : null}
-      <View style={styles.body}>{children}</View>
+      <GlassCard style={styles.body}>{children}</GlassCard>
       {footnote ? (
         <Text selectable style={styles.footnote}>
           {footnote}
@@ -31,26 +32,21 @@ const styles = StyleSheet.create({
     gap: Space.sm,
   },
   title: {
-    color: Palette.textMuted,
+    color: Palette.onGradient,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '800',
     letterSpacing: 0.6,
-    marginLeft: 2,
+    marginLeft: 4,
     textTransform: 'uppercase',
   },
   body: {
-    backgroundColor: Palette.surface,
-    borderColor: Palette.line,
-    borderRadius: Radius.card,
-    borderWidth: 1,
     gap: Space.md,
     padding: Space.lg,
-    ...Shadow.card,
   },
   footnote: {
-    color: Palette.textSubtle,
+    color: Palette.onGradientMuted,
     fontSize: 13,
     lineHeight: 18,
-    marginLeft: 2,
+    marginLeft: 4,
   },
 });

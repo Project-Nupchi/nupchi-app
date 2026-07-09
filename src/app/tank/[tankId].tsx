@@ -1,334 +1,260 @@
 import { useLocalSearchParams, router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionButton } from '@/components/action-button';
-import { PhotoAnalysisStage } from '@/components/photo-analysis-stage';
+import { GlassCard } from '@/components/glass-card';
 import { ScreenShell } from '@/components/screen-shell';
-import { Section } from '@/components/section';
+import { StateChip } from '@/components/state-chip';
 import { StatusBadge } from '@/components/status-badge';
-import { Palette, Radius, Shadow, Space } from '@/constants/aqua-theme';
+import { FlounderMark } from '@/components/tank-decor';
+import { Palette, Radius, Space } from '@/constants/aqua-theme';
 import {
   formatDateTime,
-  getCurrentStatus,
   getGroupAlertSource,
   getTankGroupStatus,
   getTankResults,
-  statusLabel,
-  TankStatus,
 } from '@/domain/aquaculture';
 import { useAquaculture } from '@/state/aquaculture-store';
 
-export default function TankHistoryScreen() {
+// 수조 상세 — 수조 정보 + 점검 내역(카드 → 분석 결과)
+export default function TankDetailScreen() {
   const { tankId } = useLocalSearchParams<{ tankId: string }>();
   const { tanks, results } = useAquaculture();
+  const insets = useSafeAreaInsets();
   const tank = tanks.find((item) => item.id === tankId);
   const tankResults = getTankResults(results, tankId);
-  const currentStatus = tank ? getTankGroupStatus(tanks, results, tank) : getCurrentStatus(results, tankId);
-  const groupAlertSource = tank ? getGroupAlertSource(tanks, results, tank) : undefined;
-  const activeAlert = tankResults.find((result) => result.grade === 'suspicious');
-  const trend = tankResults.slice(0, 5).reverse();
+  const status = tank ? getTankGroupStatus(tanks, results, tank) : 'normal';
+  const linkedSource = tank ? getGroupAlertSource(tanks, results, tank) : undefined;
 
   if (!tank) {
     return (
       <ScreenShell>
-        <View style={styles.empty}>
-          <Text selectable style={styles.emptyTitle}>
+        <GlassCard style={styles.panel}>
+          <Text selectable style={styles.panelTitle}>
             수조를 찾을 수 없습니다
           </Text>
-          <ActionButton label="목록으로" icon="list.bullet" onPress={() => router.replace('/')} />
-        </View>
+          <ActionButton label="홈으로" onPress={() => router.replace('/')} />
+        </GlassCard>
       </ScreenShell>
     );
   }
 
   return (
-    <ScreenShell>
-      <View style={styles.headerPanel}>
-        <View style={[styles.statusRail, { backgroundColor: railColors[currentStatus] }]} />
-        <View style={styles.headerRow}>
+    <ScreenShell contentStyle={{ paddingTop: insets.top + 52 }}>
+      {/* 수조 정보 헤더 */}
+      <GlassCard emphasis="strong" style={styles.header}>
+        <View style={styles.headerTop}>
           <View style={styles.headerText}>
             <Text selectable style={styles.tankId}>
               {tank.id}
             </Text>
-            <Text selectable style={styles.groupId}>
-              {tank.groupId} · 광어 전용
-            </Text>
-            <Text selectable style={styles.stockedInfo}>
-              {tank.stockedInfo}
+            <Text selectable style={styles.tankMeta}>
+              {tank.groupId}
+              {tank.active ? '' : ' · 비활성'}
             </Text>
           </View>
-          <StatusBadge status={currentStatus} />
+          <FlounderMark width={96} showLesion={status === 'suspicious'} />
         </View>
-        <ActionButton
-          label="이 수조 촬영"
-          icon="camera.fill"
-          onPress={() => router.push({ pathname: '/capture', params: { tankId } })}
-        />
-      </View>
-
-      {activeAlert ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={() =>
-            router.push({ pathname: '/result/[resultId]', params: { resultId: activeAlert.id } })
-          }
-          style={({ pressed }) => [styles.alert, pressed && styles.pressed]}
-        >
-          <Text selectable style={styles.alertTitle}>
-            활성 경보: {statusLabel[activeAlert.grade]}
-          </Text>
-          <Text selectable style={styles.alertBody}>
-            {activeAlert.evidenceSummary}
-          </Text>
-          <Text selectable style={styles.alertLink}>
-            병변 박스와 등급 근거 보기
-          </Text>
-        </Pressable>
-      ) : null}
-
-      {!activeAlert && groupAlertSource ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={() =>
-            router.push({ pathname: '/tank/[tankId]', params: { tankId: groupAlertSource.id } })
-          }
-          style={({ pressed }) => [styles.groupAlert, pressed && styles.pressed]}
-        >
-          <Text selectable style={styles.groupAlertTitle}>
-            계통 주의: {groupAlertSource.id}에서 의심 경보
-          </Text>
-          <Text selectable style={styles.alertBody}>
-            같은 {tank.groupId} 취수·배수 계통을 공유합니다. 이 수조는 직접 의심 판정은 아니지만 재촬영과 관찰 우선순위를 올렸습니다.
-          </Text>
-          <Text selectable style={styles.groupAlertLink}>
-            경보 수조 보기
-          </Text>
-        </Pressable>
-      ) : null}
-
-      <Section title="등급 추세">
-        {trend.length === 0 ? (
-          <Text selectable style={styles.muted}>
-            기록이 쌓이면 광어 수조 단위의 유병 신호 흐름이 표시됩니다.
-          </Text>
-        ) : (
-          <View style={styles.trendRow}>
-            {trend.map((result) => (
-              <View key={result.id} style={styles.trendItem}>
-                <View style={[styles.trendDot, trendDotStyle(result.grade)]} />
-                <Text selectable style={styles.trendLabel}>
-                  {statusLabel[result.grade]}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </Section>
-
-      <Section title="사진·등급 타임라인">
-        {tankResults.length === 0 ? (
-          <View style={styles.emptyInline}>
-            <Text selectable style={styles.emptyTitle}>
-              아직 기록이 없습니다
+        <Text selectable style={styles.stocked}>
+          {tank.stockedInfo}
+        </Text>
+        <View style={styles.headerBadgeRow}>
+          <StatusBadge status={status} />
+          {linkedSource && status !== 'suspicious' ? (
+            <Text selectable style={styles.linked}>
+              {linkedSource.id} 계통 주의
             </Text>
-            <Text selectable style={styles.muted}>
-              첫 촬영을 완료하면 광어 사진, AI 점검 결과, 수조군 경보 근거가 이력에 쌓입니다.
-            </Text>
-            <ActionButton
-              label="촬영 시작"
-              icon="camera"
-              onPress={() => router.push({ pathname: '/capture', params: { tankId } })}
-            />
-          </View>
-        ) : (
-          tankResults.map((result) => (
+          ) : null}
+        </View>
+        <View style={styles.headerActions}>
+          <ActionButton
+            label="이 수조 촬영"
+            icon="camera.fill"
+            onPress={() => router.push({ pathname: '/camera', params: { tankId: tank.id } })}
+            style={styles.grow}
+          />
+          <ActionButton
+            label="편집"
+            icon="pencil"
+            variant="secondary"
+            size="compact"
+            onPress={() => router.push({ pathname: '/add-tank', params: { editId: tank.id } })}
+          />
+        </View>
+      </GlassCard>
+
+      {/* 점검 내역 */}
+      <Text selectable style={styles.sectionTitle}>
+        점검 내역 {tankResults.length > 0 ? tankResults.length : ''}
+      </Text>
+
+      {tankResults.length === 0 ? (
+        <GlassCard style={styles.empty}>
+          <Text selectable style={styles.emptyBody}>
+            아직 점검 기록이 없어요. 이 수조를 촬영하면 분석 결과가 카드로 쌓입니다.
+          </Text>
+        </GlassCard>
+      ) : (
+        <View style={styles.list}>
+          {tankResults.map((result) => (
             <Pressable
               key={result.id}
               accessibilityRole="button"
-              onPress={() =>
-                router.push({ pathname: '/result/[resultId]', params: { resultId: result.id } })
-              }
-              style={({ pressed }) => [styles.timelineItem, pressed && styles.pressed]}
+              onPress={() => router.push({ pathname: '/result/[resultId]', params: { resultId: result.id } })}
+              style={({ pressed }) => pressed && styles.pressed}
             >
-              <PhotoAnalysisStage result={result} />
-              <View style={styles.timelineText}>
-                <Text selectable style={styles.timelineDate}>
-                  {formatDateTime(result.capturedAt)}
+              <GlassCard style={styles.recordCard}>
+                <View style={styles.recordTop}>
+                  <Text selectable style={styles.recordDate}>
+                    {formatDateTime(result.capturedAt)}
+                  </Text>
+                  {result.status === 'completed' ? (
+                    <StatusBadge status={result.grade} compact />
+                  ) : (
+                    <StateChip status={result.status} />
+                  )}
+                </View>
+                <Text selectable style={styles.recordSummary} numberOfLines={2}>
+                  {result.status === 'completed'
+                    ? result.evidenceSummary
+                    : result.status === 'pending'
+                      ? 'AI 분석 결과를 기다리는 중이에요.'
+                      : result.evidenceSummary}
                 </Text>
-                <StatusBadge status={result.grade} compact />
-                <Text selectable style={styles.muted}>
-                  {result.evidenceSummary || '판정 대기 중'}
-                </Text>
-              </View>
+                {result.status === 'completed' && result.diseases.length > 0 ? (
+                  <View style={styles.tagRow}>
+                    {result.diseases.map((disease) => (
+                      <View key={disease} style={styles.tag}>
+                        <Text selectable style={styles.tagText}>
+                          {disease}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </GlassCard>
             </Pressable>
-          ))
-        )}
-      </Section>
+          ))}
+        </View>
+      )}
     </ScreenShell>
   );
 }
 
-function trendDotStyle(status: 'normal' | 'caution' | 'suspicious') {
-  if (status === 'suspicious') return { backgroundColor: Palette.suspicious };
-  if (status === 'caution') return { backgroundColor: Palette.caution };
-  return { backgroundColor: Palette.normal };
-}
-
-const railColors: Record<TankStatus, string> = {
-  normal: 'transparent',
-  caution: Palette.caution,
-  suspicious: Palette.suspicious,
-};
-
 const styles = StyleSheet.create({
-  headerPanel: {
-    backgroundColor: Palette.surface,
-    borderColor: Palette.line,
-    borderRadius: Radius.card,
-    borderWidth: 1,
-    gap: Space.lg,
-    overflow: 'hidden',
+  header: {
+    gap: Space.md,
     padding: Space.lg,
-    ...Shadow.card,
   },
-  statusRail: {
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-    top: 0,
-    width: 4,
-  },
-  headerRow: {
-    alignItems: 'flex-start',
+  headerTop: {
+    alignItems: 'center',
     flexDirection: 'row',
     gap: Space.md,
     justifyContent: 'space-between',
   },
   headerText: {
     flex: 1,
-    gap: 5,
+    gap: 2,
   },
   tankId: {
     color: Palette.text,
-    fontSize: 30,
+    fontSize: 34,
     fontWeight: '800',
-    letterSpacing: -0.6,
+    letterSpacing: -0.8,
   },
-  stockedInfo: {
+  tankMeta: {
     color: Palette.textMuted,
     fontSize: 15,
-    fontWeight: '400',
-    lineHeight: 22,
-  },
-  groupId: {
-    color: Palette.accent,
-    fontSize: 14,
     fontWeight: '700',
-    letterSpacing: 0.3,
   },
-  alert: {
-    backgroundColor: Palette.suspiciousBg,
-    borderColor: Palette.suspiciousLine,
-    borderRadius: Radius.card,
-    borderWidth: 1,
-    gap: 8,
-    padding: Space.lg,
-  },
-  alertTitle: {
-    color: Palette.suspicious,
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  alertBody: {
-    color: Palette.text,
+  stocked: {
+    color: Palette.textMuted,
     fontSize: 15,
-    fontWeight: '400',
     lineHeight: 22,
   },
-  alertLink: {
-    color: Palette.suspicious,
-    fontSize: 14,
-    fontWeight: '700',
+  headerBadgeRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: Space.md,
   },
-  groupAlert: {
-    backgroundColor: Palette.cautionBg,
-    borderColor: Palette.cautionLine,
-    borderRadius: Radius.card,
-    borderWidth: 1,
-    gap: 8,
-    padding: Space.lg,
-  },
-  groupAlertTitle: {
+  linked: {
     color: Palette.caution,
-    fontSize: 18,
+    fontSize: 13,
     fontWeight: '800',
-    letterSpacing: -0.3,
   },
-  groupAlertLink: {
-    color: Palette.caution,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  trendRow: {
+  headerActions: {
     flexDirection: 'row',
     gap: Space.sm,
   },
-  trendItem: {
-    alignItems: 'center',
+  grow: {
     flex: 1,
-    gap: 8,
   },
-  trendDot: {
-    height: 10,
-    width: '100%',
-    borderRadius: Radius.pill,
+  sectionTitle: {
+    color: Palette.onGradient,
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    marginLeft: 4,
+    marginTop: Space.sm,
   },
-  trendLabel: {
-    color: Palette.textMuted,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  timelineItem: {
-    borderBottomColor: Palette.line,
-    borderBottomWidth: 1,
+  list: {
     gap: Space.md,
-    paddingBottom: Space.md,
   },
-  timelineText: {
+  recordCard: {
     gap: Space.sm,
+    padding: Space.lg,
   },
-  timelineDate: {
+  recordTop: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  recordDate: {
     color: Palette.text,
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
     letterSpacing: -0.2,
   },
-  muted: {
+  recordSummary: {
     color: Palette.textMuted,
     fontSize: 14,
-    fontWeight: '400',
     lineHeight: 21,
   },
+  tagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Space.xs,
+  },
+  tag: {
+    backgroundColor: Palette.suspiciousBg,
+    borderRadius: Radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  tagText: {
+    color: Palette.suspicious,
+    fontSize: 12,
+    fontWeight: '800',
+  },
   empty: {
-    backgroundColor: Palette.surface,
-    borderColor: Palette.line,
-    borderRadius: Radius.card,
-    borderWidth: 1,
+    padding: Space.xl,
+  },
+  emptyBody: {
+    color: Palette.textMuted,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  panel: {
     gap: Space.md,
     padding: Space.lg,
-    ...Shadow.card,
   },
-  emptyInline: {
-    gap: Space.md,
-  },
-  emptyTitle: {
+  panelTitle: {
     color: Palette.text,
     fontSize: 20,
     fontWeight: '800',
-    letterSpacing: -0.4,
   },
   pressed: {
-    opacity: 0.8,
+    opacity: 0.85,
   },
 });

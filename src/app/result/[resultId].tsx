@@ -3,14 +3,16 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/action-button';
+import { GlassCard } from '@/components/glass-card';
 import { PhotoAnalysisStage } from '@/components/photo-analysis-stage';
 import { ScreenShell } from '@/components/screen-shell';
-import { Section } from '@/components/section';
+import { StateChip } from '@/components/state-chip';
 import { StatusBadge } from '@/components/status-badge';
-import { Palette, Radius, Shadow, Space } from '@/constants/aqua-theme';
-import { flounderDiseaseLabels, formatDateTime, statusLabel } from '@/domain/aquaculture';
+import { Palette, Radius, Space } from '@/constants/aqua-theme';
+import { formatDateTime, statusLabel } from '@/domain/aquaculture';
 import { useAquaculture } from '@/state/aquaculture-store';
 
+// 분석 결과 — 촬영 후 서버 판정을 대기/완료/실패로 표시
 export default function ResultScreen() {
   const { resultId } = useLocalSearchParams<{ resultId: string }>();
   const { results, tanks, applyInspectionVerdict, failInspection, retryInspection } = useAquaculture();
@@ -20,20 +22,14 @@ export default function ResultScreen() {
   useEffect(() => {
     if (result?.status !== 'pending') return;
     let isCurrent = true;
-
     import('@/services/inspection-server')
       .then(({ requestInspectionVerdict }) => requestInspectionVerdict(result))
       .then((verdict) => {
-        if (isCurrent) {
-          applyInspectionVerdict(verdict);
-        }
+        if (isCurrent) applyInspectionVerdict(verdict);
       })
       .catch(() => {
-        if (isCurrent) {
-          failInspection(result.id);
-        }
+        if (isCurrent) failInspection(result.id);
       });
-
     return () => {
       isCurrent = false;
     };
@@ -42,121 +38,124 @@ export default function ResultScreen() {
   if (!result) {
     return (
       <ScreenShell>
-        <View style={styles.panel}>
+        <GlassCard style={styles.panel}>
           <Text selectable style={styles.title}>
-            점검 결과를 찾을 수 없습니다
+            분석 결과를 찾을 수 없습니다
           </Text>
-          <ActionButton label="목록으로" icon="list.bullet" onPress={() => router.replace('/')} />
-        </View>
+          <ActionButton label="홈으로" icon="house" onPress={() => router.replace('/')} />
+        </GlassCard>
       </ScreenShell>
     );
   }
 
   return (
-    <ScreenShell>
+    <ScreenShell contentStyle={styles.content}>
+      <View style={styles.metaRow}>
+        <Text selectable style={styles.metaText}>
+          {tank?.id ?? result.tankId} · {tank?.groupId ?? '수조군'} · {formatDateTime(result.capturedAt)}
+        </Text>
+        <StateChip status={result.status} />
+      </View>
+
       <PhotoAnalysisStage result={result} />
 
       {result.status === 'pending' ? (
-        <View style={styles.pendingPanel}>
-          <ActivityIndicator color={Palette.accent} />
-          <Text selectable style={styles.title}>
-            판정 중
+        <GlassCard style={styles.pending}>
+          <ActivityIndicator color={Palette.primary} />
+          <Text selectable style={styles.pendingTitle}>
+            AI가 분석 중이에요
           </Text>
           <Text selectable style={styles.body}>
-            서버가 광어 이미지에서 어체·의심 부위를 검출하고 7개 질병 후보를 병렬 판정하고 있습니다.
+            촬영본은 이미 저장됐어요. 서버가 어체·병변 부위를 검출하고 질병 후보를 판정하고 있어요.
           </Text>
-        </View>
+        </GlassCard>
       ) : null}
 
       {result.status === 'failed' ? (
-        <View style={styles.panel}>
+        <GlassCard style={styles.panel}>
           <Text selectable style={styles.title}>
-            판정 실패
+            분석 실패
           </Text>
           <Text selectable style={styles.body}>
             {result.evidenceSummary}
           </Text>
           <ActionButton label="재시도" icon="arrow.clockwise" onPress={() => retryInspection(result.id)} />
-        </View>
+        </GlassCard>
       ) : null}
 
       {result.status === 'completed' ? (
         <>
-          <View style={[styles.resultHead, gradePanels[result.grade]]}>
-            <View style={styles.resultMeta}>
-              <Text selectable style={styles.kicker}>
-                {tank?.id ?? result.tankId} · {tank?.groupId ?? '수조군'} · {formatDateTime(result.capturedAt)}
+          <GlassCard emphasis="strong" style={[styles.gradeCard, gradeTint[result.grade]]}>
+            <View style={styles.gradeText}>
+              <Text selectable style={styles.gradeKicker}>
+                분석 상태
               </Text>
-              <Text selectable style={[styles.title, { color: gradeTitleColors[result.grade] }]}>
-                {statusLabel[result.grade]} 등급
+              <Text selectable style={[styles.gradeWord, { color: gradeColor[result.grade] }]}>
+                {statusLabel[result.grade]}
               </Text>
             </View>
             <StatusBadge status={result.grade} />
-          </View>
+          </GlassCard>
 
-          <Section title="AI 판정 근거">
-            <InfoRow label="부위" value={result.bodyParts.join(', ') || '감지 없음'} />
-            <InfoRow label="의심 질병" value={result.diseases.join(', ') || '의심 후보 없음'} />
-            <InfoRow label="판정 범위" value={flounderDiseaseLabels.join(', ')} />
-            <Text selectable style={styles.body}>
+          <GlassCard style={styles.detailCard}>
+            <DetailRow label="증상" value={result.lesions.map((l) => l.label).join(', ') || result.bodyParts.join(', ') || '특이 소견 없음'} />
+            <DetailRow label="의심 질병" value={result.diseases.join(', ') || '의심 질병 없음'} />
+            <DetailRow label="관찰 부위" value={result.bodyParts.join(', ') || '감지 없음'} />
+            <View style={styles.divider} />
+            <Text selectable style={styles.summary}>
               {result.evidenceSummary}
             </Text>
-          </Section>
+          </GlassCard>
 
-          <View style={styles.notice}>
-            <Text selectable style={styles.noticeTitle}>
-              확진 아님
-            </Text>
-            <Text selectable style={styles.noticeBody}>
-              이 결과는 광어 이미지 기반 선별 보조 정보입니다. 최종 진단, 격리, 투약, 신고 판단은 관리자와 전문가 확인을 거쳐야 합니다.
-            </Text>
-          </View>
-
-          {result.grade === 'suspicious' ? (
+          {result.grade !== 'normal' ? (
             <ActionButton
-              label="대응·신고 안내 보기"
-              icon="exclamationmark.triangle.fill"
-              variant="danger"
+              label="AI 대응 제안 보기"
+              icon="sparkles"
+              variant={result.grade === 'suspicious' ? 'danger' : 'primary'}
               onPress={() => router.push({ pathname: '/guidance/[resultId]', params: { resultId: result.id } })}
             />
           ) : null}
+
+          <View style={styles.notice}>
+            <Text selectable style={styles.noticeText}>
+              이 결과는 확률적 참고치이며 확진이 아닙니다. 격리·투약·신고 등 최종 판단은 관리자와 전문가 확인을 거쳐야 합니다.
+            </Text>
+          </View>
         </>
       ) : null}
 
       <View style={styles.bottomActions}>
-        <ActionButton label="목록으로" icon="list.bullet" variant="secondary" onPress={() => router.replace('/')} style={styles.actionFlex} />
+        <ActionButton label="홈으로" variant="secondary" onPress={() => router.replace('/')} style={styles.grow} />
         <ActionButton
           label="다시 촬영"
-          icon="camera"
           variant="secondary"
-          onPress={() => router.push({ pathname: '/capture', params: { tankId: result.tankId } })}
-          style={styles.actionFlex}
+          onPress={() => router.replace({ pathname: '/camera', params: { tankId: result.tankId } })}
+          style={styles.grow}
         />
       </View>
     </ScreenShell>
   );
 }
 
-// 판정 등급별 헤더 패널 배경·테두리
-const gradePanels = {
-  normal: { backgroundColor: Palette.surface, borderColor: Palette.line },
-  caution: { backgroundColor: Palette.cautionBg, borderColor: Palette.cautionLine },
-  suspicious: { backgroundColor: Palette.suspiciousBg, borderColor: Palette.suspiciousLine },
+const gradeTint = {
+  normal: { borderColor: Palette.normalLine },
+  caution: { borderColor: Palette.cautionLine },
+  suspicious: { borderColor: Palette.suspiciousLine },
 } as const;
 
-const gradeTitleColors = {
-  normal: Palette.text,
+const gradeColor = {
+  normal: Palette.normal,
   caution: Palette.caution,
   suspicious: Palette.suspicious,
 } as const;
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <View style={styles.infoRow}>
-      <Text selectable style={styles.infoLabel}>
+    <View style={styles.detailRow}>
+      <Text selectable style={styles.detailLabel}>
         {label}
       </Text>
-      <Text selectable style={styles.infoValue}>
+      <Text selectable style={styles.detailValue}>
         {value}
       </Text>
     </View>
@@ -164,96 +163,118 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  pendingPanel: {
+  content: {
+    gap: Space.md,
+  },
+  metaRow: {
     alignItems: 'center',
-    backgroundColor: Palette.surface,
-    borderColor: Palette.line,
-    borderRadius: Radius.card,
-    borderWidth: 1,
-    gap: Space.md,
-    padding: Space.xl,
-    ...Shadow.card,
-  },
-  panel: {
-    backgroundColor: Palette.surface,
-    borderColor: Palette.line,
-    borderRadius: Radius.card,
-    borderWidth: 1,
-    gap: Space.md,
-    padding: Space.lg,
-    ...Shadow.card,
-  },
-  resultHead: {
-    alignItems: 'flex-start',
-    borderRadius: Radius.card,
-    borderWidth: 1,
     flexDirection: 'row',
     gap: Space.md,
     justifyContent: 'space-between',
-    padding: Space.lg,
-    ...Shadow.card,
+    marginTop: Space.xl,
   },
-  resultMeta: {
+  metaText: {
+    color: Palette.onGradient,
     flex: 1,
-    gap: 4,
-  },
-  kicker: {
-    color: Palette.textMuted,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
+  },
+  pending: {
+    alignItems: 'center',
+    gap: Space.sm,
+    padding: Space.xl,
+  },
+  pendingTitle: {
+    color: Palette.text,
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  panel: {
+    gap: Space.md,
+    padding: Space.lg,
   },
   title: {
     color: Palette.text,
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
-    letterSpacing: -0.5,
-    lineHeight: 30,
   },
   body: {
     color: Palette.textMuted,
     fontSize: 15,
-    fontWeight: '400',
     lineHeight: 23,
+    textAlign: 'center',
   },
-  infoRow: {
-    gap: 4,
-  },
-  infoLabel: {
-    color: Palette.textSubtle,
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-  },
-  infoValue: {
-    color: Palette.text,
-    fontSize: 16,
-    fontWeight: '600',
-    lineHeight: 23,
-  },
-  notice: {
-    backgroundColor: Palette.cautionBg,
-    borderColor: Palette.cautionLine,
-    borderRadius: Radius.card,
-    borderWidth: 1,
-    gap: 6,
+  gradeCard: {
+    alignItems: 'center',
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    gap: Space.md,
+    justifyContent: 'space-between',
     padding: Space.lg,
   },
-  noticeTitle: {
-    color: Palette.caution,
-    fontSize: 15,
-    fontWeight: '800',
+  gradeText: {
+    gap: 2,
   },
-  noticeBody: {
-    color: Palette.text,
+  gradeKicker: {
+    color: Palette.textSubtle,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  gradeWord: {
+    fontSize: 34,
+    fontWeight: '800',
+    letterSpacing: -0.8,
+  },
+  detailCard: {
+    gap: Space.md,
+    padding: Space.lg,
+  },
+  detailRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: Space.md,
+  },
+  detailLabel: {
+    color: Palette.textSubtle,
     fontSize: 14,
-    fontWeight: '400',
-    lineHeight: 21,
+    fontWeight: '800',
+    width: 72,
+  },
+  detailValue: {
+    color: Palette.text,
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 23,
+  },
+  divider: {
+    backgroundColor: Palette.glassHairline,
+    height: 1,
+  },
+  summary: {
+    color: Palette.textMuted,
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  notice: {
+    backgroundColor: Palette.glassMuted,
+    borderRadius: Radius.button,
+    padding: Space.md,
+  },
+  noticeText: {
+    color: Palette.text,
+    fontSize: 13,
+    lineHeight: 20,
+    opacity: 0.9,
   },
   bottomActions: {
     flexDirection: 'row',
     gap: Space.md,
+    marginTop: Space.xs,
   },
-  actionFlex: {
+  grow: {
     flex: 1,
   },
 });

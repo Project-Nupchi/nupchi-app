@@ -1,11 +1,13 @@
 import { Image } from 'expo-image';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Palette, Radius, Shadow } from '@/constants/aqua-theme';
+import { FlounderMark } from '@/components/tank-decor';
+import { Palette, Radius, Shadow, Water } from '@/constants/aqua-theme';
 import { InspectionResult } from '@/domain/aquaculture';
 
 export function PhotoAnalysisStage({ result }: { result: InspectionResult }) {
   const hasPhoto = Boolean(result.photoUri && !result.photoUri.startsWith('mock://'));
+  const completed = result.status === 'completed';
 
   return (
     <View style={styles.frame}>
@@ -13,25 +15,19 @@ export function PhotoAnalysisStage({ result }: { result: InspectionResult }) {
         <Image source={{ uri: result.photoUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
       ) : (
         <View style={styles.placeholder}>
-          <View style={styles.fishShape} />
-          <Text selectable style={styles.placeholderText}>
-            촬영 이미지
-          </Text>
+          <View style={styles.sandBed} />
+          <FlounderMark width={200} showLesion={completed && result.lesions.length > 0} />
         </View>
       )}
 
-      {result.status === 'completed'
+      {/* 실제 사진일 때만 좌표 기반 병변 박스를 그린다 */}
+      {hasPhoto && completed
         ? result.lesions.map((box) => (
             <View
               key={box.id}
               style={[
                 styles.box,
-                {
-                  left: `${box.x}%`,
-                  top: `${box.y}%`,
-                  width: `${box.width}%`,
-                  height: `${box.height}%`,
-                },
+                { left: `${box.x}%`, top: `${box.y}%`, width: `${box.width}%`, height: `${box.height}%` },
               ]}
             >
               <Text selectable style={styles.boxLabel}>
@@ -47,53 +43,52 @@ export function PhotoAnalysisStage({ result }: { result: InspectionResult }) {
 const styles = StyleSheet.create({
   frame: {
     aspectRatio: 4 / 3,
-    backgroundColor: Palette.ink,
+    backgroundColor: '#EAF1F8',
+    borderColor: Palette.glassLine,
     borderRadius: Radius.card,
+    borderWidth: 1,
     overflow: 'hidden',
     position: 'relative',
     ...Shadow.card,
   },
   placeholder: {
+    alignItems: 'center',
     bottom: 0,
+    justifyContent: 'center',
     left: 0,
     position: 'absolute',
     right: 0,
     top: 0,
-    alignItems: 'center',
-    backgroundColor: '#DCE7E4',
-    justifyContent: 'center',
-    gap: 12,
   },
-  fishShape: {
-    width: '70%',
-    height: 52,
-    borderRadius: 999,
-    backgroundColor: '#8CA39B',
-    transform: [{ rotate: '-5deg' }],
-  },
-  placeholderText: {
-    color: Palette.textMuted,
-    fontSize: 14,
-    fontWeight: '600',
+  sandBed: {
+    backgroundColor: Water.sandBed,
+    borderTopLeftRadius: 80,
+    borderTopRightRadius: 50,
+    bottom: 0,
+    height: '22%',
+    left: 0,
+    position: 'absolute',
+    right: 0,
   },
   box: {
-    position: 'absolute',
-    borderColor: Palette.suspicious,
+    backgroundColor: 'rgba(210, 69, 58, 0.12)',
+    borderColor: Water.lesion,
     borderRadius: 4,
+    borderStyle: 'dashed',
     borderWidth: 2,
-    backgroundColor: 'rgba(192, 54, 44, 0.12)',
+    position: 'absolute',
   },
   boxLabel: {
-    position: 'absolute',
-    left: -2,
-    top: -26,
-    backgroundColor: Palette.suspicious,
+    backgroundColor: Water.lesion,
     borderRadius: 5,
     color: Palette.white,
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
+    left: -2,
     overflow: 'hidden',
     paddingHorizontal: 8,
     paddingVertical: 3,
+    position: 'absolute',
+    top: -26,
   },
 });

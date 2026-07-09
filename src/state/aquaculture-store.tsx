@@ -13,10 +13,25 @@ type CreateInspectionInput = {
   clues: string[];
 };
 
+type Session = {
+  isLoggedIn: boolean;
+  farmName: string;
+};
+
 type AquacultureStore = {
+  session: Session;
+  login: (farmName: string) => void;
+  logout: () => void;
   tanks: Tank[];
   results: InspectionResult[];
+  // 확인 처리된 경보(resultId 목록)
+  ackedAlertIds: string[];
+  acknowledgeAlert: (resultId: string) => void;
+  reminderEnabled: boolean;
+  setReminderEnabled: (enabled: boolean) => void;
   addTank: (id: string, groupId: string, stockedInfo: string) => { ok: true } | { ok: false; message: string };
+  updateTank: (id: string, groupId: string, stockedInfo: string) => { ok: true } | { ok: false; message: string };
+  setTankActive: (id: string, active: boolean) => void;
   createInspection: (input: CreateInspectionInput) => string;
   applyInspectionVerdict: (verdict: InspectionResult) => void;
   failInspection: (resultId: string) => void;
@@ -26,8 +41,25 @@ type AquacultureStore = {
 const AquacultureContext = createContext<AquacultureStore | null>(null);
 
 export function AquacultureProvider({ children }: PropsWithChildren) {
+  const [session, setSession] = useState<Session>({ isLoggedIn: false, farmName: '' });
   const [tanks, setTanks] = useState<Tank[]>(initialTanks);
   const [results, setResults] = useState<InspectionResult[]>(initialResults);
+  const [ackedAlertIds, setAckedAlertIds] = useState<string[]>([]);
+  const [reminderEnabled, setReminderEnabled] = useState(true);
+
+  const login = useCallback((farmName: string) => {
+    setSession({ isLoggedIn: true, farmName: farmName.trim() || '제주 광어 양식장' });
+  }, []);
+
+  const logout = useCallback(() => {
+    setSession({ isLoggedIn: false, farmName: '' });
+  }, []);
+
+  const acknowledgeAlert = useCallback((resultId: string) => {
+    setAckedAlertIds((current) =>
+      current.includes(resultId) ? current.filter((id) => id !== resultId) : [...current, resultId]
+    );
+  }, []);
 
   const addTank = useCallback<AquacultureStore['addTank']>(
     (id, groupId, stockedInfo) => {
@@ -46,6 +78,7 @@ export function AquacultureProvider({ children }: PropsWithChildren) {
           groupId: normalizedGroupId,
           stockedInfo: stockedInfo.trim() || '광어 입식 정보 미입력',
           createdAt: new Date().toISOString(),
+          active: true,
         },
         ...current,
       ]);
@@ -53,6 +86,34 @@ export function AquacultureProvider({ children }: PropsWithChildren) {
     },
     [tanks]
   );
+
+  const updateTank = useCallback<AquacultureStore['updateTank']>(
+    (id, groupId, stockedInfo) => {
+      const normalizedGroupId = groupId.trim() || '미지정 계통';
+      const exists = tanks.some((tank) => tank.id === id);
+      if (!exists) {
+        return { ok: false, message: '수정할 수조를 찾을 수 없습니다.' };
+      }
+
+      setTanks((current) =>
+        current.map((tank) =>
+          tank.id === id
+            ? {
+                ...tank,
+                groupId: normalizedGroupId,
+                stockedInfo: stockedInfo.trim() || '광어 입식 정보 미입력',
+              }
+            : tank
+        )
+      );
+      return { ok: true };
+    },
+    [tanks]
+  );
+
+  const setTankActive = useCallback<AquacultureStore['setTankActive']>((id, active) => {
+    setTanks((current) => current.map((tank) => (tank.id === id ? { ...tank, active } : tank)));
+  }, []);
 
   const createInspection = useCallback((input: CreateInspectionInput) => {
     const id = `R-${Date.now()}`;
@@ -109,15 +170,40 @@ export function AquacultureProvider({ children }: PropsWithChildren) {
 
   const value = useMemo(
     () => ({
+      session,
+      login,
+      logout,
       tanks,
       results,
+      ackedAlertIds,
+      acknowledgeAlert,
+      reminderEnabled,
+      setReminderEnabled,
       addTank,
+      updateTank,
+      setTankActive,
       createInspection,
       applyInspectionVerdict,
       failInspection,
       retryInspection,
     }),
-    [addTank, applyInspectionVerdict, createInspection, failInspection, results, retryInspection, tanks]
+    [
+      session,
+      login,
+      logout,
+      tanks,
+      results,
+      ackedAlertIds,
+      acknowledgeAlert,
+      reminderEnabled,
+      addTank,
+      updateTank,
+      setTankActive,
+      createInspection,
+      applyInspectionVerdict,
+      failInspection,
+      retryInspection,
+    ]
   );
 
   return <AquacultureContext value={value}>{children}</AquacultureContext>;

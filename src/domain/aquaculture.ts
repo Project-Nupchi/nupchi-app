@@ -15,6 +15,8 @@ export type Tank = {
   groupId: string;
   stockedInfo: string;
   createdAt: string;
+  // 출하 완료 등으로 비활성화된 수조 (기록·이력은 보존, 목록에선 뮤트)
+  active: boolean;
 };
 
 export type InspectionResult = {
@@ -61,18 +63,21 @@ export const initialTanks: Tank[] = [
     groupId: '1계통',
     stockedInfo: '광어 18,000미, 입식 42일차',
     createdAt: '2026-07-01T08:20:00.000Z',
+    active: true,
   },
   {
     id: 'A-08',
     groupId: '1계통',
     stockedInfo: '광어 17,600미, 입식 42일차',
     createdAt: '2026-06-15T07:10:00.000Z',
+    active: true,
   },
   {
     id: 'B-03',
     groupId: '2계통',
     stockedInfo: '광어 15,200미, 입식 31일차',
     createdAt: '2026-07-03T10:00:00.000Z',
+    active: true,
   },
 ];
 
@@ -185,6 +190,50 @@ export function sortTanksByRisk(tanks: Tank[], results: InspectionResult[]) {
     const bTime = getLatestResult(results, b.id)?.capturedAt ?? b.createdAt;
     return new Date(bTime).getTime() - new Date(aTime).getTime();
   });
+}
+
+// 수조군 단위 요약: 그룹명, 소속 수조 수, 그룹 내 최고 경보 등급 (S2)
+export type GroupSummary = {
+  groupId: string;
+  tankCount: number;
+  topStatus: TankStatus;
+};
+
+export function getGroupSummaries(tanks: Tank[], results: InspectionResult[]): GroupSummary[] {
+  const groups = new Map<string, Tank[]>();
+  for (const tank of tanks) {
+    const list = groups.get(tank.groupId) ?? [];
+    list.push(tank);
+    groups.set(tank.groupId, list);
+  }
+
+  return [...groups.entries()]
+    .map(([groupId, groupTanks]) => {
+      const topStatus = groupTanks.reduce<TankStatus>((worst, tank) => {
+        const status = getTankGroupStatus(tanks, results, tank);
+        return statusWeight[status] < statusWeight[worst] ? status : worst;
+      }, 'normal');
+      return { groupId, tankCount: groupTanks.length, topStatus };
+    })
+    .sort((a, b) => statusWeight[a.topStatus] - statusWeight[b.topStatus]);
+}
+
+// 활성 경보: 의심 등급으로 완료된 판정 (S11)
+export function getActiveAlerts(results: InspectionResult[]) {
+  return results
+    .filter((result) => result.status === 'completed' && result.grade === 'suspicious')
+    .sort((a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime());
+}
+
+export function isCapturedToday(value: string) {
+  const target = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', dateStyle: 'short' }).format(new Date(value));
+  const today = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', dateStyle: 'short' }).format(new Date());
+  return target === today;
+}
+
+// 오늘 촬영이 완료된 수조 수 (S1 촬영 진행률)
+export function countTanksCapturedToday(tanks: Tank[], results: InspectionResult[]) {
+  return tanks.filter((tank) => getTankResults(results, tank.id).some((result) => isCapturedToday(result.capturedAt))).length;
 }
 
 export function gradeFromClues(clues: string[]): TankStatus {

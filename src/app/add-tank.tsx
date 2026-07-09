@@ -1,24 +1,33 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
+import { KeyboardAvoidingView, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
 
 import { ActionButton } from '@/components/action-button';
 import { Palette, Radius, Space } from '@/constants/aqua-theme';
 import { useAquaculture } from '@/state/aquaculture-store';
 
+// 수조 추가·편집 (editId 있으면 편집)
 export default function AddTankSheet() {
-  const { addTank } = useAquaculture();
-  const [tankId, setTankId] = useState('');
-  const [groupId, setGroupId] = useState('');
-  const [stockedInfo, setStockedInfo] = useState('');
+  const { editId } = useLocalSearchParams<{ editId?: string }>();
+  const { tanks, addTank, updateTank, setTankActive } = useAquaculture();
+  const editing = tanks.find((tank) => tank.id === editId);
+
+  const [tankId, setTankId] = useState(editing?.id ?? '');
+  const [groupId, setGroupId] = useState(editing?.groupId ?? '');
+  const [stockedInfo, setStockedInfo] = useState(editing?.stockedInfo ?? '');
+  const [active, setActive] = useState(editing?.active ?? true);
   const [error, setError] = useState('');
 
   const save = () => {
-    const result = addTank(tankId, groupId, stockedInfo);
-    if (!result.ok) {
-      setError(result.message);
+    if (editing) {
+      const res = updateTank(editing.id, groupId, stockedInfo);
+      if (!res.ok) return setError(res.message);
+      if (active !== editing.active) setTankActive(editing.id, active);
+      router.back();
       return;
     }
+    const res = addTank(tankId, groupId, stockedInfo);
+    if (!res.ok) return setError(res.message);
     router.back();
   };
 
@@ -31,35 +40,22 @@ export default function AddTankSheet() {
           </Text>
           <TextInput
             autoCapitalize="characters"
-            autoFocus
-            onChangeText={(value) => {
-              setTankId(value);
+            autoFocus={!editing}
+            editable={!editing}
+            onChangeText={(v) => {
+              setTankId(v);
               setError('');
             }}
             placeholder="예: D-02"
             placeholderTextColor={Palette.textSubtle}
-            style={styles.input}
+            style={[styles.input, Boolean(editing) && styles.inputLocked]}
             value={tankId}
           />
         </View>
 
         <View style={styles.field}>
           <Text selectable style={styles.label}>
-            입식 정보
-          </Text>
-          <TextInput
-            multiline
-            onChangeText={setStockedInfo}
-            placeholder="광어 수량, 입식일 등"
-            placeholderTextColor={Palette.textSubtle}
-            style={[styles.input, styles.textArea]}
-            value={stockedInfo}
-          />
-        </View>
-
-        <View style={styles.field}>
-          <Text selectable style={styles.label}>
-            수조군
+            수조군 (취수·배수 계통)
           </Text>
           <TextInput
             onChangeText={setGroupId}
@@ -70,6 +66,34 @@ export default function AddTankSheet() {
           />
         </View>
 
+        <View style={styles.field}>
+          <Text selectable style={styles.label}>
+            입식 정보
+          </Text>
+          <TextInput
+            multiline
+            onChangeText={setStockedInfo}
+            placeholder="입식일 · 마릿수 · 크기 등"
+            placeholderTextColor={Palette.textSubtle}
+            style={[styles.input, styles.textArea]}
+            value={stockedInfo}
+          />
+        </View>
+
+        {editing ? (
+          <Pressable style={styles.activeRow} onPress={() => setActive((p) => !p)}>
+            <View style={styles.activeText}>
+              <Text selectable style={styles.activeLabel}>
+                수조 활성
+              </Text>
+              <Text selectable style={styles.hint}>
+                출하 완료 시 비활성 처리합니다. 이력은 보존됩니다.
+              </Text>
+            </View>
+            <Switch value={active} onValueChange={setActive} trackColor={{ true: Palette.primary, false: '#C9D4DD' }} thumbColor={Palette.white} />
+          </Pressable>
+        ) : null}
+
         {error ? (
           <Text selectable style={styles.error}>
             {error}
@@ -78,8 +102,8 @@ export default function AddTankSheet() {
       </View>
 
       <View style={styles.footer}>
-        <ActionButton label="취소" variant="secondary" onPress={() => router.back()} style={styles.footerButton} />
-        <ActionButton label="저장" icon="checkmark" onPress={save} style={styles.footerButton} />
+        <ActionButton label="취소" variant="secondary" onPress={() => router.back()} style={styles.grow} />
+        <ActionButton label="저장" icon="checkmark" onPress={save} style={styles.grow} />
       </View>
     </KeyboardAvoidingView>
   );
@@ -101,39 +125,65 @@ const styles = StyleSheet.create({
   label: {
     color: Palette.textMuted,
     fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.4,
+    fontWeight: '800',
+    letterSpacing: 0.3,
     marginLeft: 2,
   },
   input: {
     backgroundColor: Palette.surface,
-    borderColor: Palette.line,
+    borderColor: Palette.glassHairline,
     borderRadius: Radius.input,
     borderWidth: 1,
     color: Palette.text,
     fontSize: 17,
-    fontWeight: '500',
-    minHeight: 52,
+    fontWeight: '600',
+    minHeight: 54,
     paddingHorizontal: 16,
   },
+  inputLocked: {
+    backgroundColor: 'rgba(18, 49, 76, 0.05)',
+    color: Palette.textMuted,
+  },
   textArea: {
-    minHeight: 110,
+    minHeight: 92,
     paddingTop: 14,
     textAlignVertical: 'top',
+  },
+  hint: {
+    color: Palette.textSubtle,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  activeRow: {
+    alignItems: 'center',
+    backgroundColor: Palette.surface,
+    borderColor: Palette.glassHairline,
+    borderRadius: Radius.card,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: Space.md,
+    padding: Space.md,
+  },
+  activeText: {
+    flex: 1,
+    gap: 2,
+  },
+  activeLabel: {
+    color: Palette.text,
+    fontSize: 16,
+    fontWeight: '800',
   },
   error: {
     color: Palette.suspicious,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   footer: {
-    borderTopColor: Palette.line,
-    borderTopWidth: 1,
     flexDirection: 'row',
     gap: Space.md,
     padding: Space.lg,
   },
-  footerButton: {
+  grow: {
     flex: 1,
   },
 });

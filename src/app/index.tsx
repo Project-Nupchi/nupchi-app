@@ -1,363 +1,340 @@
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ActionButton } from '@/components/action-button';
+import { GlassCard } from '@/components/glass-card';
 import { ScreenShell } from '@/components/screen-shell';
 import { StatusBadge } from '@/components/status-badge';
+import { FlounderMark } from '@/components/tank-decor';
 import { Palette, Radius, Shadow, Space } from '@/constants/aqua-theme';
 import {
   formatDateTime,
-  getCurrentStatus,
   getGroupAlertSource,
   getLatestResult,
   getTankGroupStatus,
   sortTanksByRisk,
-  statusLabel,
   TankStatus,
 } from '@/domain/aquaculture';
 import { useAquaculture } from '@/state/aquaculture-store';
 
-const railColors: Record<TankStatus, string> = {
-  normal: 'transparent',
-  caution: Palette.caution,
-  suspicious: Palette.suspicious,
+const headline: Record<TankStatus, { word: string; message: string }> = {
+  normal: { word: '양호', message: '광어들이 건강한 상태예요.' },
+  caution: { word: '주의', message: '일부 수조에 주의가 필요해요.' },
+  suspicious: { word: '의심', message: '의심 수조를 바로 확인하세요.' },
 };
 
 export default function HomeScreen() {
-  const { tanks, results } = useAquaculture();
-  const sortedTanks = useMemo(() => sortTanksByRisk(tanks, results), [results, tanks]);
-  const firstTankId = sortedTanks[0]?.id;
-  const suspiciousCount = sortedTanks.filter((tank) => getCurrentStatus(results, tank.id) === 'suspicious').length;
-  const groupWatchCount = sortedTanks.filter(
-    (tank) => getCurrentStatus(results, tank.id) === 'normal' && getTankGroupStatus(tanks, results, tank) === 'caution'
-  ).length;
+  const { session, tanks, results } = useAquaculture();
+  const insets = useSafeAreaInsets();
+  const sorted = useMemo(() => sortTanksByRisk(tanks, results), [results, tanks]);
+
+  const counts = { normal: 0, caution: 0, suspicious: 0 };
+  for (const tank of tanks) counts[getTankGroupStatus(tanks, results, tank)] += 1;
+  const overall: TankStatus = counts.suspicious > 0 ? 'suspicious' : counts.caution > 0 ? 'caution' : 'normal';
+  const state = headline[overall];
 
   return (
-    <ScreenShell>
-      <View style={styles.summaryBand}>
-        <View pointerEvents="none" style={styles.heroGlowLarge} />
-        <View pointerEvents="none" style={styles.heroGlowSmall} />
-        <View style={styles.summaryText}>
-          <Text selectable style={styles.kicker}>
-            오늘의 우선 점검
+    <View style={styles.root}>
+      <ScreenShell bottomInset={insets.bottom + 110}>
+        {/* 넙치 히어로 + 상태 문구 */}
+        <View style={[styles.hero, { paddingTop: insets.top + Space.xl }]}>
+          <Text selectable style={styles.farmName}>
+            {session.farmName}
           </Text>
-          <Text selectable style={styles.summaryTitle}>
-            {suspiciousCount > 0 ? `의심 수조 ${suspiciousCount}개` : '의심 수조 없음'}
+          <View style={styles.flounderWrap}>
+            <FlounderMark width={196} showLesion={overall === 'suspicious'} />
+          </View>
+          <Text selectable style={styles.statusWord}>
+            {state.word}
           </Text>
-          <Text selectable style={styles.summaryBody}>
-            광어 수조만 관리합니다. 의심 수조와 같은 취수·배수 계통의 수조를 함께 상단에 올렸습니다.
+          <Text selectable style={styles.statusMessage}>
+            {state.message}
           </Text>
+          <View style={styles.countRow}>
+            <CountPill label="정상" value={counts.normal} tint={Palette.normal} />
+            <CountPill label="주의" value={counts.caution} tint={Palette.caution} />
+            <CountPill label="의심" value={counts.suspicious} tint={Palette.suspicious} />
+          </View>
         </View>
 
-        <View style={styles.statRow}>
-          <HeroStat value={tanks.length} label="광어 수조" />
-          <View style={styles.statDivider} />
-          <HeroStat value={suspiciousCount} label="의심" tone={suspiciousCount > 0 ? 'danger' : undefined} />
-          <View style={styles.statDivider} />
-          <HeroStat value={groupWatchCount} label="계통 주의" tone={groupWatchCount > 0 ? 'caution' : undefined} />
+        {/* 수조별 현황 서브헤더 + 추가 버튼 */}
+        <View style={styles.subHeader}>
+          <Text selectable style={styles.subHeaderTitle}>
+            수조별 현황
+          </Text>
+          <Pressable
+            accessibilityLabel="수조 추가"
+            accessibilityRole="button"
+            onPress={() => router.push('/add-tank')}
+            style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
+          >
+            <View style={styles.plusH} />
+            <View style={styles.plusV} />
+          </Pressable>
         </View>
 
-        <ActionButton
-          label="바로 촬영"
-          icon="camera.fill"
-          disabled={!firstTankId}
-          onPress={() => router.push({ pathname: '/capture', params: { tankId: firstTankId } })}
-        />
-      </View>
-
-      <View style={styles.toolbar}>
-        <Text selectable style={styles.toolbarTitle}>
-          전체 수조
-        </Text>
-        <ActionButton
-          label="수조 추가"
-          icon="plus"
-          variant="secondary"
-          onPress={() => router.push('/add-tank')}
-          style={styles.addButton}
-        />
-      </View>
-
-      {sortedTanks.length === 0 ? (
-        <View style={styles.empty}>
-          <Text selectable style={styles.emptyTitle}>
-            아직 수조가 없습니다
-          </Text>
-          <Text selectable style={styles.emptyBody}>
-            수조 ID, 수조군, 광어 입식 정보를 추가하면 목록에서 상태를 바로 확인할 수 있습니다.
-          </Text>
-          <ActionButton label="수조 추가" icon="plus" onPress={() => router.push('/add-tank')} />
-        </View>
-      ) : (
-        <View style={styles.list}>
-          {sortedTanks.map((tank) => {
-            const directStatus = getCurrentStatus(results, tank.id);
-            const status = getTankGroupStatus(tanks, results, tank);
-            const groupAlertSource = getGroupAlertSource(tanks, results, tank);
-            const latest = getLatestResult(results, tank.id);
-
-            return (
-              <View key={tank.id} style={[styles.card, status === 'suspicious' && styles.cardSuspicious]}>
-                <View style={[styles.statusRail, { backgroundColor: railColors[status] }]} />
+        {sorted.length === 0 ? (
+          <GlassCard style={styles.emptyCard}>
+            <Text selectable style={styles.emptyTitle}>
+              아직 수조가 없어요
+            </Text>
+            <Text selectable style={styles.emptyBody}>
+              오른쪽 위 + 버튼으로 첫 수조를 추가해 보세요.
+            </Text>
+          </GlassCard>
+        ) : (
+          <View style={styles.list}>
+            {sorted.map((tank) => {
+              const status = getTankGroupStatus(tanks, results, tank);
+              const latest = getLatestResult(results, tank.id);
+              const linked = Boolean(getGroupAlertSource(tanks, results, tank));
+              return (
                 <Pressable
+                  key={tank.id}
                   accessibilityRole="button"
                   onPress={() => router.push({ pathname: '/tank/[tankId]', params: { tankId: tank.id } })}
-                  style={({ pressed }) => [styles.cardTapArea, pressed && styles.cardPressed]}
+                  style={({ pressed }) => pressed && styles.pressed}
                 >
-                  <View style={styles.cardTop}>
-                    <View style={styles.cardIdentity}>
+                  <GlassCard style={styles.card}>
+                    <View style={styles.cardLeft}>
                       <Text selectable style={styles.tankId}>
                         {tank.id}
                       </Text>
-                      <Text selectable style={styles.groupId}>
-                        {tank.groupId}
+                      <Text selectable style={styles.tankMeta}>
+                        {tank.groupId} · {tank.stockedInfo}
                       </Text>
-                      <Text selectable style={styles.stockedInfo}>
-                        {tank.stockedInfo}
+                      <Text selectable style={styles.tankSub}>
+                        {latest ? `최근 촬영 ${formatDateTime(latest.capturedAt)}` : '촬영 기록 없음'}
+                        {linked && status !== 'suspicious' ? ' · 계통 주의' : ''}
                       </Text>
                     </View>
                     <StatusBadge status={status} />
-                  </View>
-
-                  <View style={styles.cardMeta}>
-                    <Text selectable style={styles.metaText}>
-                      최근 촬영 {latest ? formatDateTime(latest.capturedAt) : '기록 없음'}
-                    </Text>
-                    <Text selectable style={[styles.metaText, status !== 'normal' && styles.dangerText]}>
-                      {groupAlertSource
-                        ? `${groupAlertSource.id} 경보로 계통 주의`
-                        : directStatus === 'suspicious'
-                          ? '근거 확인 필요'
-                          : `${statusLabel[directStatus]} 추적 중`}
-                    </Text>
-                  </View>
+                  </GlassCard>
                 </Pressable>
+              );
+            })}
+          </View>
+        )}
+      </ScreenShell>
 
-                <ActionButton
-                  label="이 수조 촬영"
-                  icon="camera"
-                  variant={directStatus === 'suspicious' ? 'danger' : 'secondary'}
-                  onPress={() => router.push({ pathname: '/capture', params: { tankId: tank.id } })}
-                />
-              </View>
-            );
-          })}
-        </View>
-      )}
-    </ScreenShell>
+      {/* 카메라 FAB */}
+      <Pressable
+        accessibilityLabel="촬영"
+        accessibilityRole="button"
+        onPress={() => router.push('/camera')}
+        style={({ pressed }) => [styles.fab, { bottom: insets.bottom + Space.lg }, pressed && styles.fabPressed]}
+      >
+        <CameraGlyph />
+      </Pressable>
+    </View>
   );
 }
 
-function HeroStat({ value, label, tone }: { value: number; label: string; tone?: 'danger' | 'caution' }) {
+function CountPill({ label, value, tint }: { label: string; value: number; tint: string }) {
   return (
-    <View style={styles.stat}>
-      <Text selectable style={[styles.statValue, tone === 'danger' && styles.statDanger, tone === 'caution' && styles.statCaution]}>
-        {value}
-      </Text>
-      <Text selectable style={styles.statLabel}>
+    <View style={styles.countPill}>
+      <View style={[styles.countDot, { backgroundColor: tint }]} />
+      <Text selectable style={styles.countLabel}>
         {label}
+      </Text>
+      <Text selectable style={styles.countValue}>
+        {value}
       </Text>
     </View>
   );
 }
 
+// View 조합 카메라 글리프 (모든 플랫폼 동일)
+function CameraGlyph() {
+  return (
+    <View style={glyph.body}>
+      <View style={glyph.bump} />
+      <View style={glyph.lens} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  summaryBand: {
-    backgroundColor: Palette.ink,
-    borderRadius: Radius.card,
-    overflow: 'hidden',
-    padding: Space.xl,
-    gap: Space.lg,
-    ...Shadow.raised,
-  },
-  heroGlowLarge: {
-    backgroundColor: 'rgba(143, 216, 203, 0.07)',
-    borderRadius: Radius.pill,
-    height: 260,
-    position: 'absolute',
-    right: -90,
-    top: -120,
-    width: 260,
-  },
-  heroGlowSmall: {
-    backgroundColor: 'rgba(143, 216, 203, 0.05)',
-    borderRadius: Radius.pill,
-    bottom: -70,
-    height: 170,
-    left: -60,
-    position: 'absolute',
-    width: 170,
-  },
-  summaryText: {
-    gap: Space.xs,
-  },
-  kicker: {
-    color: Palette.inkMint,
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-  },
-  summaryTitle: {
-    color: Palette.white,
-    fontSize: 30,
-    fontWeight: '800',
-    letterSpacing: -0.6,
-    lineHeight: 37,
-  },
-  summaryBody: {
-    color: Palette.inkMuted,
-    fontSize: 15,
-    fontWeight: '400',
-    lineHeight: 23,
-  },
-  statRow: {
-    alignItems: 'center',
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderRadius: Radius.button,
-    borderWidth: 1,
-    flexDirection: 'row',
-    paddingVertical: Space.md,
-  },
-  stat: {
-    alignItems: 'center',
+  root: {
+    backgroundColor: Palette.canvas,
     flex: 1,
-    gap: 2,
   },
-  statDivider: {
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    height: 30,
-    width: 1,
+  hero: {
+    alignItems: 'center',
+    gap: 4,
   },
-  statValue: {
-    color: Palette.white,
-    fontSize: 24,
+  farmName: {
+    color: Palette.onGradientMuted,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  flounderWrap: {
+    marginVertical: Space.sm,
+  },
+  statusWord: {
+    color: Palette.onGradient,
+    fontSize: 52,
     fontWeight: '800',
-    letterSpacing: -0.5,
+    letterSpacing: -1,
+    lineHeight: 58,
   },
-  statDanger: {
-    color: '#FFB4AD',
-  },
-  statCaution: {
-    color: '#FFD9A0',
-  },
-  statLabel: {
-    color: Palette.inkMuted,
-    fontSize: 12,
+  statusMessage: {
+    color: Palette.onGradientMuted,
+    fontSize: 15,
     fontWeight: '600',
   },
-  toolbar: {
+  countRow: {
+    flexDirection: 'row',
+    gap: Space.sm,
+    marginTop: Space.md,
+  },
+  countPill: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: Radius.pill,
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  countDot: {
+    borderRadius: Radius.pill,
+    height: 8,
+    width: 8,
+  },
+  countLabel: {
+    color: Palette.onGradient,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  countValue: {
+    color: Palette.onGradient,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  subHeader: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: Space.md,
+    marginTop: Space.sm,
   },
-  toolbarTitle: {
-    color: Palette.text,
-    fontSize: 19,
-    fontWeight: '700',
+  subHeaderTitle: {
+    color: Palette.onGradient,
+    fontSize: 20,
+    fontWeight: '800',
     letterSpacing: -0.3,
   },
   addButton: {
-    minHeight: 44,
+    alignItems: 'center',
+    backgroundColor: Palette.glassStrong,
+    borderColor: Palette.glassLine,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+    ...Shadow.card,
+  },
+  plusH: {
+    backgroundColor: Palette.primary,
+    borderRadius: 2,
+    height: 2.5,
+    position: 'absolute',
+    width: 16,
+  },
+  plusV: {
+    backgroundColor: Palette.primary,
+    borderRadius: 2,
+    height: 16,
+    position: 'absolute',
+    width: 2.5,
   },
   list: {
     gap: Space.md,
   },
   card: {
-    backgroundColor: Palette.surface,
-    borderColor: Palette.line,
-    borderRadius: Radius.card,
-    borderWidth: 1,
-    gap: Space.md,
-    overflow: 'hidden',
-    padding: Space.lg,
-    ...Shadow.card,
-  },
-  cardSuspicious: {
-    borderColor: Palette.suspiciousLine,
-  },
-  statusRail: {
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-    top: 0,
-    width: 4,
-  },
-  cardTapArea: {
-    gap: Space.md,
-  },
-  cardPressed: {
-    opacity: 0.82,
-    transform: [{ scale: 0.99 }],
-  },
-  cardTop: {
-    alignItems: 'flex-start',
+    alignItems: 'center',
     flexDirection: 'row',
     gap: Space.md,
-    justifyContent: 'space-between',
+    padding: Space.lg,
   },
-  cardIdentity: {
+  cardLeft: {
     flex: 1,
-    gap: 4,
+    gap: 3,
   },
   tankId: {
     color: Palette.text,
-    fontSize: 23,
+    fontSize: 22,
     fontWeight: '800',
     letterSpacing: -0.4,
   },
-  stockedInfo: {
+  tankMeta: {
     color: Palette.textMuted,
     fontSize: 14,
-    fontWeight: '400',
-    lineHeight: 20,
+    fontWeight: '600',
   },
-  groupId: {
-    color: Palette.accent,
+  tankSub: {
+    color: Palette.textSubtle,
     fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.3,
   },
-  cardMeta: {
-    borderTopColor: Palette.line,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: Space.md,
-    paddingTop: Space.md,
-  },
-  metaText: {
-    color: Palette.textMuted,
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  dangerText: {
-    color: Palette.suspicious,
-    fontWeight: '700',
-    textAlign: 'right',
-  },
-  empty: {
-    alignItems: 'stretch',
-    backgroundColor: Palette.surface,
-    borderColor: Palette.line,
-    borderRadius: Radius.card,
-    borderWidth: 1,
-    gap: Space.md,
+  emptyCard: {
+    gap: Space.sm,
     padding: Space.xl,
-    ...Shadow.card,
   },
   emptyTitle: {
     color: Palette.text,
-    fontSize: 21,
+    fontSize: 20,
     fontWeight: '800',
-    letterSpacing: -0.4,
   },
   emptyBody: {
     color: Palette.textMuted,
     fontSize: 15,
-    fontWeight: '400',
-    lineHeight: 23,
+    lineHeight: 22,
+  },
+  fab: {
+    alignItems: 'center',
+    backgroundColor: Palette.ink,
+    borderRadius: Radius.pill,
+    height: 64,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: Space.lg,
+    width: 64,
+    ...Shadow.raised,
+  },
+  fabPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.96 }],
+  },
+  pressed: {
+    opacity: 0.85,
+  },
+});
+
+const glyph = StyleSheet.create({
+  body: {
+    alignItems: 'center',
+    borderColor: Palette.white,
+    borderRadius: 7,
+    borderWidth: 2.5,
+    height: 24,
+    justifyContent: 'center',
+    width: 30,
+  },
+  bump: {
+    backgroundColor: Palette.white,
+    borderRadius: 2,
+    height: 5,
+    position: 'absolute',
+    top: -5.5,
+    width: 12,
+  },
+  lens: {
+    borderColor: Palette.white,
+    borderRadius: Radius.pill,
+    borderWidth: 2.5,
+    height: 11,
+    width: 11,
   },
 });
