@@ -33,10 +33,11 @@ export type InspectionResult = {
   lesions: LesionBox[];
 };
 
+// 디자인 언어: 양호(초록) / 의심(주황) / 경고(빨강)
 export const statusLabel: Record<TankStatus, string> = {
-  normal: '정상',
-  caution: '주의',
-  suspicious: '의심',
+  normal: '양호',
+  caution: '의심',
+  suspicious: '경고',
 };
 
 export const statusWeight: Record<TankStatus, number> = {
