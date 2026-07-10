@@ -19,6 +19,7 @@ export const InspectionStatusCopy: Record<InspectionStatus, string> = {
 
 export const AppCopy = {
   common: {
+    back: '뒤로',
     home: '홈으로',
     close: '닫기',
     cancel: '취소',
@@ -36,8 +37,9 @@ export const AppCopy = {
     result: '분석 결과',
     guidance: 'AI 대응 제안',
     addTank: '수조 추가',
+    editTank: '수조 편집',
     home: '홈',
-    tankStatus: '수조 현황',
+    tankStatus: '수조 목록',
     capture: '촬영',
   },
   login: {
@@ -83,7 +85,7 @@ export const AppCopy = {
     stockedInfo: '입식 정보',
     stockedInfoPlaceholder: '입식일 · 마릿수 · 크기 등',
     active: '수조 활성',
-    activeHint: '출하 완료 시 비활성 처리합니다. 이력은 보존됩니다.',
+    activeHint: '수조 출하 완료 시 비활성화 해주세요.\n점검 내역 등의 이력은 보존됩니다.',
   },
   home: {
     todayStatus: '오늘의 수조 상태',

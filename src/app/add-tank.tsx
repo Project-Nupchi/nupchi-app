@@ -1,18 +1,44 @@
 import { useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { KeyboardAvoidingView, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  type TextInputProps,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ActionButton } from '@/components/action-button';
-import { Gradient, Palette, Radius, Shadow, Space } from '@/constants/aqua-theme';
+import { FigmaTokens, Gradient, Palette, Radius, Space, Type } from '@/constants/aqua-theme';
 import { AppCopy } from '@/constants/copy';
 import { useAquaculture } from '@/state/aquaculture-store';
 
-// 수조 추가·편집 (editId 있으면 편집)
-export default function AddTankSheet() {
+type TankFieldProps = Omit<TextInputProps, 'multiline' | 'placeholderTextColor' | 'style'> & {
+  label: string;
+  multiline?: boolean;
+};
+
+type FormButtonProps = {
+  disabled?: boolean;
+  label: string;
+  onPress: () => void;
+  variant: 'primary' | 'secondary';
+};
+
+// Figma의 수조 추가·편집 화면은 같은 폼 구조를 공유하며 editId로 모드를 구분한다.
+export default function TankFormScreen() {
   const { editId } = useLocalSearchParams<{ editId?: string }>();
   const { tanks, addTank, updateTank } = useAquaculture();
+  const insets = useSafeAreaInsets();
+  const isEditMode = Boolean(editId);
   const editing = tanks.find((tank) => tank.id === editId);
+  const missingEditingTank = isEditMode && !editing;
 
   const [tankId, setTankId] = useState(editing?.id ?? '');
   const [groupId, setGroupId] = useState(editing?.groupId ?? '');
@@ -21,102 +47,230 @@ export default function AddTankSheet() {
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  const title = isEditMode ? AppCopy.navigation.editTank : AppCopy.navigation.addTank;
+  const saveDisabled = isSaving || missingEditingTank;
+  const footerBottom = Math.max(insets.bottom + Space.md - Space.xxs, Space.lg);
+
+  const clearError = () => setError('');
+
   const save = async () => {
-    setIsSaving(true);
-    setError('');
-    if (editing) {
-      const res = await updateTank(editing.id, groupId, stockedInfo, active);
-      if (!res.ok) {
-        setIsSaving(false);
-        return setError(res.message);
-      }
-      router.back();
+    if (isSaving) return;
+    if (isEditMode && !editing) {
+      setError(AppCopy.validation.tankNotFound);
       return;
     }
-    const res = await addTank(tankId, groupId, stockedInfo);
-    if (!res.ok) {
+
+    setIsSaving(true);
+    setError('');
+
+    const result = editing
+      ? await updateTank(editing.id, groupId, stockedInfo, active)
+      : await addTank(tankId, groupId, stockedInfo);
+
+    if (!result.ok) {
       setIsSaving(false);
-      return setError(res.message);
+      setError(result.message);
+      return;
     }
+
     router.back();
   };
 
   return (
-    <KeyboardAvoidingView behavior="padding" style={styles.root}>
-      <LinearGradient colors={[...Gradient.colors]} locations={[...Gradient.locations]} style={StyleSheet.absoluteFill} />
-      <View style={styles.content}>
-        <View style={styles.field}>
-          <Text selectable style={styles.label}>
-            {AppCopy.addTank.tankId}
-          </Text>
-          <TextInput
-            autoCapitalize="characters"
-            autoFocus={!editing}
-            editable={!editing}
-            onChangeText={(v) => {
-              setTankId(v);
-              setError('');
-            }}
-            placeholder={AppCopy.addTank.tankIdPlaceholder}
-            placeholderTextColor={Palette.textSubtle}
-            style={[styles.input, Boolean(editing) && styles.inputLocked]}
-            value={tankId}
-          />
-        </View>
+    <View style={styles.root}>
+      <StatusBar style="dark" />
+      <LinearGradient
+        colors={[...Gradient.colors]}
+        locations={[...Gradient.locations]}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={[StyleSheet.absoluteFill, styles.gradientWash]} />
 
-        <View style={styles.field}>
-          <Text selectable style={styles.label}>
-            {AppCopy.addTank.groupId}
-          </Text>
-          <TextInput
-            onChangeText={setGroupId}
-            placeholder={AppCopy.addTank.groupIdPlaceholder}
-            placeholderTextColor={Palette.textSubtle}
-            style={styles.input}
-            value={groupId}
-          />
-        </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardAvoiding}
+      >
+        <View style={{ height: insets.top }} />
+        <AppBar title={title} />
 
-        <View style={styles.field}>
-          <Text selectable style={styles.label}>
-            {AppCopy.addTank.stockedInfo}
-          </Text>
-          <TextInput
-            multiline
-            onChangeText={setStockedInfo}
-            placeholder={AppCopy.addTank.stockedInfoPlaceholder}
-            placeholderTextColor={Palette.textSubtle}
-            style={[styles.input, styles.textArea]}
-            value={stockedInfo}
-          />
-        </View>
+        <ScrollView
+          contentInsetAdjustmentBehavior="never"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+        >
+          <View style={styles.form}>
+            <TankField
+              accessibilityState={{ disabled: isEditMode }}
+              autoCapitalize="characters"
+              editable={!isEditMode}
+              label={AppCopy.addTank.tankId}
+              onChangeText={(value) => {
+                setTankId(value);
+                clearError();
+              }}
+              placeholder={AppCopy.addTank.tankIdPlaceholder}
+              returnKeyType="next"
+              value={tankId}
+            />
 
-        {editing ? (
-          <Pressable style={styles.activeRow} onPress={() => setActive((p) => !p)}>
-            <View style={styles.activeText}>
-              <Text selectable style={styles.activeLabel}>
-                {AppCopy.addTank.active}
+            <TankField
+              label={AppCopy.addTank.groupId}
+              onChangeText={(value) => {
+                setGroupId(value);
+                clearError();
+              }}
+              placeholder={AppCopy.addTank.groupIdPlaceholder}
+              returnKeyType="next"
+              value={groupId}
+            />
+
+            <TankField
+              label={AppCopy.addTank.stockedInfo}
+              multiline
+              onChangeText={(value) => {
+                setStockedInfo(value);
+                clearError();
+              }}
+              placeholder={AppCopy.addTank.stockedInfoPlaceholder}
+              value={stockedInfo}
+            />
+
+            {isEditMode ? (
+              <View style={styles.activeRow}>
+                <View style={styles.activeCopy}>
+                  <Text selectable style={styles.activeLabel}>
+                    {AppCopy.addTank.active}
+                  </Text>
+                  <Text selectable style={styles.activeHint}>
+                    {AppCopy.addTank.activeHint}
+                  </Text>
+                </View>
+                <TankSwitch
+                  disabled={missingEditingTank}
+                  onChange={(value) => {
+                    setActive(value);
+                    clearError();
+                  }}
+                  value={active}
+                />
+              </View>
+            ) : null}
+
+            {error || missingEditingTank ? (
+              <Text accessibilityLiveRegion="polite" selectable style={styles.error}>
+                {error || AppCopy.validation.tankNotFound}
               </Text>
-              <Text selectable style={styles.hint}>
-                {AppCopy.addTank.activeHint}
-              </Text>
-            </View>
-            <Switch value={active} onValueChange={setActive} trackColor={{ true: Palette.primary, false: '#C9D4DD' }} thumbColor={Palette.white} />
-          </Pressable>
-        ) : null}
+            ) : null}
+          </View>
+        </ScrollView>
 
-        {error ? (
-          <Text selectable style={styles.error}>
-            {error}
-          </Text>
-        ) : null}
-      </View>
+        <View style={[styles.footer, { paddingBottom: footerBottom }]}>
+          <View style={styles.footerActions}>
+            <FormButton
+              disabled={isSaving}
+              label={AppCopy.common.cancel}
+              onPress={() => router.back()}
+              variant="secondary"
+            />
+            <FormButton
+              disabled={saveDisabled}
+              label={AppCopy.common.save}
+              onPress={save}
+              variant="primary"
+            />
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </View>
+  );
+}
 
-      <View style={styles.footer}>
-        <ActionButton label={AppCopy.common.cancel} variant="secondary" disabled={isSaving} onPress={() => router.back()} style={styles.grow} />
-        <ActionButton label={AppCopy.common.save} icon="checkmark" disabled={isSaving} onPress={save} style={styles.grow} />
-      </View>
-    </KeyboardAvoidingView>
+function AppBar({ title }: { title: string }) {
+  return (
+    <View style={styles.appBar}>
+      <Pressable
+        accessibilityLabel={AppCopy.common.back}
+        accessibilityRole="button"
+        hitSlop={8}
+        onPress={() => router.back()}
+        style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+      >
+        <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.backIcon}>
+          <View style={styles.backChevron} />
+        </View>
+      </Pressable>
+      <Text selectable style={styles.appBarTitle}>
+        {title}
+      </Text>
+      <View style={styles.appBarTrailing} />
+    </View>
+  );
+}
+
+function TankField({ label, multiline = false, ...inputProps }: TankFieldProps) {
+  return (
+    <View style={styles.field}>
+      <Text selectable style={styles.fieldLabel}>
+        {label}
+      </Text>
+      <TextInput
+        {...inputProps}
+        accessibilityLabel={label}
+        cursorColor={Palette.primary}
+        multiline={multiline}
+        placeholderTextColor={FigmaTokens.color.gray[300]}
+        selectionColor={Palette.primary}
+        style={[styles.input, multiline && styles.textArea]}
+      />
+    </View>
+  );
+}
+
+function TankSwitch({ disabled, onChange, value }: { disabled?: boolean; onChange: (value: boolean) => void; value: boolean }) {
+  return (
+    <Pressable
+      accessibilityLabel={AppCopy.addTank.active}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value, disabled }}
+      disabled={disabled}
+      hitSlop={8}
+      onPress={() => onChange(!value)}
+      style={({ pressed }) => [
+        styles.switchTrack,
+        value ? styles.switchTrackActive : styles.switchTrackInactive,
+        { justifyContent: value ? 'flex-end' : 'flex-start' },
+        pressed && styles.pressed,
+      ]}
+    >
+      <View style={styles.switchThumb} />
+    </Pressable>
+  );
+}
+
+function FormButton({ disabled = false, label, onPress, variant }: FormButtonProps) {
+  const primary = variant === 'primary';
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.formButton,
+        primary ? styles.primaryButton : styles.secondaryButton,
+        disabled && primary && styles.primaryButtonDisabled,
+        disabled && !primary && styles.secondaryButtonDisabled,
+        pressed && !disabled && styles.buttonPressed,
+      ]}
+    >
+      <Text selectable={false} style={[styles.buttonLabel, primary && styles.primaryButtonLabel]}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -125,78 +279,183 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.canvas,
     flex: 1,
   },
-  content: {
+  gradientWash: {
+    backgroundColor: FigmaTokens.color.white[80],
+    pointerEvents: 'none',
+  },
+  keyboardAvoiding: {
     flex: 1,
-    gap: Space.lg,
-    padding: Space.lg,
+  },
+  appBar: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    height: 60,
+    justifyContent: 'space-between',
+    paddingHorizontal: Space.lg,
+    position: 'relative',
+  },
+  backButton: {
+    alignItems: 'center',
+    height: 28,
+    justifyContent: 'center',
+    width: 28,
+    zIndex: 1,
+  },
+  backIcon: {
+    alignItems: 'center',
+    height: 28,
+    justifyContent: 'center',
+    width: 28,
+  },
+  backChevron: {
+    borderBottomColor: Palette.text,
+    borderBottomWidth: 2,
+    borderLeftColor: Palette.text,
+    borderLeftWidth: 2,
+    height: 10,
+    marginLeft: Space.xs,
+    transform: [{ rotate: '45deg' }],
+    width: 10,
+  },
+  appBarTitle: {
+    color: FigmaTokens.color.gray[950],
+    left: Space.lg + 28,
+    pointerEvents: 'none',
+    position: 'absolute',
+    right: Space.lg + 28,
+    textAlign: 'center',
+    ...Type.title,
+  },
+  appBarTrailing: {
+    height: 28,
+    width: 28,
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    alignItems: 'center',
+    paddingBottom: Space.lg,
+    paddingHorizontal: Space.lg,
+    paddingTop: Space.md,
+  },
+  form: {
+    gap: Space.lg + Space.xs,
+    maxWidth: 520,
+    width: '100%',
   },
   field: {
     gap: Space.sm,
+    width: '100%',
   },
-  label: {
-    color: Palette.textMuted,
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-    marginLeft: 2,
+  fieldLabel: {
+    color: FigmaTokens.color.gray[800],
+    ...Type.fieldLabel,
   },
   input: {
-    backgroundColor: Palette.glassStrong,
-    borderColor: Palette.glassLine,
+    backgroundColor: FigmaTokens.color.white[100],
+    borderColor: FigmaTokens.color.gray[100],
     borderRadius: Radius.input,
     borderWidth: 1,
-    color: Palette.text,
-    fontSize: 17,
-    fontWeight: '600',
-    minHeight: 54,
-    paddingHorizontal: 16,
-    ...Shadow.card,
-  },
-  inputLocked: {
-    backgroundColor: 'rgba(255, 255, 255, 0.55)',
-    color: Palette.textMuted,
+    color: FigmaTokens.color.gray[950],
+    height: 56,
+    paddingHorizontal: Space.md,
+    paddingVertical: 0,
+    ...Type.body1,
   },
   textArea: {
-    minHeight: 92,
-    paddingTop: 14,
+    height: 104,
+    paddingBottom: Space.md,
+    paddingTop: Space.md,
     textAlignVertical: 'top',
   },
-  hint: {
-    color: Palette.textSubtle,
-    fontSize: 13,
-    lineHeight: 18,
-  },
   activeRow: {
-    alignItems: 'center',
-    backgroundColor: Palette.glassStrong,
-    borderColor: Palette.glassLine,
-    borderRadius: Radius.card,
-    borderWidth: 1,
+    alignItems: 'flex-start',
     flexDirection: 'row',
-    gap: Space.md,
-    padding: Space.md,
-    ...Shadow.card,
+    gap: Space.sm + Space.xxs,
+    width: '100%',
   },
-  activeText: {
+  activeCopy: {
     flex: 1,
-    gap: 2,
+    gap: Space.xs,
   },
   activeLabel: {
-    color: Palette.text,
-    fontSize: 16,
-    fontWeight: '800',
+    color: FigmaTokens.color.gray[950],
+    ...Type.body1,
+  },
+  activeHint: {
+    color: FigmaTokens.color.gray[500],
+    ...Type.caption,
+  },
+  switchTrack: {
+    borderRadius: Radius.pill,
+    flexDirection: 'row',
+    height: 28,
+    padding: Space.xxs,
+    width: 48,
+  },
+  switchTrackActive: {
+    backgroundColor: FigmaTokens.color.blue[500],
+  },
+  switchTrackInactive: {
+    backgroundColor: FigmaTokens.color.gray[200],
+  },
+  switchThumb: {
+    backgroundColor: FigmaTokens.color.white[100],
+    borderRadius: Radius.pill,
+    height: 24,
+    width: 24,
   },
   error: {
-    color: Palette.suspicious,
-    fontSize: 14,
-    fontWeight: '700',
+    color: FigmaTokens.color.status.dangerText,
+    ...Type.caption,
   },
   footer: {
-    flexDirection: 'row',
-    gap: Space.md,
-    padding: Space.lg,
+    alignItems: 'center',
+    paddingHorizontal: Space.lg,
+    paddingTop: Space.lg,
   },
-  grow: {
+  footerActions: {
+    flexDirection: 'row',
+    gap: Space.sm + Space.xs,
+    maxWidth: 520,
+    width: '100%',
+  },
+  formButton: {
+    alignItems: 'center',
+    borderRadius: Radius.button,
     flex: 1,
+    height: 56,
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  primaryButton: {
+    backgroundColor: FigmaTokens.color.blue[500],
+  },
+  primaryButtonDisabled: {
+    backgroundColor: FigmaTokens.color.blue[300],
+  },
+  secondaryButton: {
+    backgroundColor: FigmaTokens.color.gray[50],
+    borderColor: FigmaTokens.color.white[80],
+    borderWidth: 1,
+  },
+  secondaryButtonDisabled: {
+    opacity: 0.5,
+  },
+  buttonLabel: {
+    color: FigmaTokens.color.gray[950],
+    textAlign: 'center',
+    ...Type.button,
+  },
+  primaryButtonLabel: {
+    color: FigmaTokens.color.white[100],
+  },
+  pressed: {
+    opacity: 0.72,
+  },
+  buttonPressed: {
+    opacity: 0.82,
+    transform: [{ scale: 0.99 }],
   },
 });

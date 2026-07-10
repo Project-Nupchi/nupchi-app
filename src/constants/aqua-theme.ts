@@ -78,6 +78,7 @@ export const FigmaTokens = {
   },
   typography: {
     display: { fontFamily: 'Pretendard', fontSize: 28, fontWeight: '700', lineHeight: 39, letterSpacing: -0.84 },
+    appBarTitle: { fontFamily: 'Pretendard', fontSize: 24, fontWeight: '600', lineHeight: 34, letterSpacing: -0.48 },
     title: { fontFamily: 'Pretendard', fontSize: 20, fontWeight: '600', lineHeight: 28, letterSpacing: -0.4 },
     heading1: { fontFamily: 'Pretendard', fontSize: 20, fontWeight: '700', lineHeight: 26, letterSpacing: -0.2 },
     heading2: { fontFamily: 'Pretendard', fontSize: 18, fontWeight: '600', lineHeight: 25, letterSpacing: -0.36 },
@@ -108,7 +109,7 @@ export const FigmaTokens = {
   },
 } as const;
 
-// 배경 그라디언트 (Figma 홈/수조 현황 기준: 물빛 → 흰 배경)
+// 배경 그라디언트 (Figma 홈/수조 목록 기준: 물빛 → 흰 배경)
 export const Gradient = {
   colors: FigmaTokens.gradient.screen,
   locations: FigmaTokens.gradient.locations,

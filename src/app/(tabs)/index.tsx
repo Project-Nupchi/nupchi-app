@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View, ViewStyle, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Gradient, Palette, Radius, Shadow, Space, Type, Water } from '@/constants/aqua-theme';
@@ -12,26 +12,17 @@ import { useAquaculture } from '@/state/aquaculture-store';
 
 // Figma 홈 디자인 에셋 (넙치 일러스트 · 상태/탭 아이콘)
 // SVG 원본은 CSS 변수·blur 필터를 포함해 네이티브에서 렌더링되지 않으므로 PNG(3x)를 사용
-const flounderImg = require('../../assets/images/home/flounder.png');
-const flounderWarnImg = require('../../assets/images/home/flounder-warn.png');
-const mapPinImg = require('../../assets/images/home/map-pin.png');
-const chevronBlueImg = require('../../assets/images/home/chevron-blue.png');
-const chevronDarkImg = require('../../assets/images/home/chevron-dark.png');
-const cameraImg = require('../../assets/images/home/camera.png');
-const tabHomeImg = require('../../assets/images/home/tab-home.png');
-const tabListImg = require('../../assets/images/home/tab-list.png');
+const flounderImg = require('../../../assets/images/home/flounder.png');
+const flounderWarnImg = require('../../../assets/images/home/flounder-warn.png');
+const mapPinImg = require('../../../assets/images/home/map-pin.png');
+const chevronBlueImg = require('../../../assets/images/home/chevron-blue.png');
+const chevronDarkImg = require('../../../assets/images/home/chevron-dark.png');
 
 const statusIcons: Record<TankStatus, number> = {
-  suspicious: require('../../assets/images/home/status-warn.png'),
-  caution: require('../../assets/images/home/status-suspect.png'),
-  normal: require('../../assets/images/home/status-good.png'),
+  suspicious: require('../../../assets/images/home/status-warn.png'),
+  caution: require('../../../assets/images/home/status-suspect.png'),
+  normal: require('../../../assets/images/home/status-good.png'),
 };
-
-// 웹 전용 프로스티드 블러 (네이티브는 반투명 배경으로 대체)
-const webBlur =
-  Platform.OS === 'web'
-    ? ({ backdropFilter: 'blur(15px)', WebkitBackdropFilter: 'blur(15px)' } as unknown as ViewStyle)
-    : null;
 
 export default function HomeScreen() {
   const { session, tanks, results } = useAquaculture();
@@ -69,7 +60,7 @@ export default function HomeScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + Space.md, paddingBottom: insets.bottom + 140 }]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: Space.xl, paddingTop: insets.top + Space.md }]}
       >
         <View style={styles.container}>
           {/* 위치 헤더 */}
@@ -154,36 +145,6 @@ export default function HomeScreen() {
           })}
         </ScrollView>
       </ScrollView>
-
-      {/* 하단 탭바 (다크 글래스) */}
-      <View style={[styles.tabBar, webBlur, { bottom: insets.bottom + Space.lg }]}>
-        <Pressable accessibilityRole="button" style={[styles.tabItem, styles.tabItemActive]}>
-          <Image source={tabHomeImg} style={[styles.tabIcon, styles.tabIconActive]} contentFit="contain" />
-          <Text selectable={false} style={styles.tabLabelActive}>
-            {AppCopy.navigation.home}
-          </Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push('/tank-status')}
-          style={styles.tabItem}
-        >
-          <Image source={tabListImg} style={[styles.tabIcon, styles.tabIconInactive]} contentFit="contain" />
-          <Text selectable={false} style={styles.tabLabel}>
-            {AppCopy.navigation.tankStatus}
-          </Text>
-        </Pressable>
-      </View>
-
-      {/* 카메라 FAB (다크 글래스) */}
-      <Pressable
-        accessibilityLabel={AppCopy.navigation.capture}
-        accessibilityRole="button"
-        onPress={() => router.push('/camera')}
-        style={({ pressed }) => [styles.fab, webBlur, { bottom: insets.bottom + Space.lg }, pressed && styles.fabPressed]}
-      >
-        <Image source={cameraImg} style={styles.fabIcon} contentFit="contain" />
-      </Pressable>
     </View>
   );
 }
@@ -355,71 +316,6 @@ const styles = StyleSheet.create({
   cardStatusText: {
     color: Palette.text,
     ...Type.label1,
-  },
-  tabBar: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    borderColor: 'rgba(255, 255, 255, 0.8)',
-    borderWidth: 1,
-    borderRadius: Radius.pill,
-    flexDirection: 'row',
-    gap: 4,
-    height: 64,
-    left: Space.lg,
-    paddingHorizontal: 4,
-    position: 'absolute',
-    ...Shadow.raised,
-  },
-  tabItem: {
-    alignItems: 'center',
-    borderRadius: Radius.pill,
-    gap: 2,
-    height: 56,
-    justifyContent: 'center',
-    width: 80,
-  },
-  tabItemActive: {
-    backgroundColor: Palette.white,
-  },
-  tabIcon: {
-    height: 24,
-    width: 24,
-  },
-  tabIconActive: {
-    tintColor: Palette.ink,
-  },
-  tabIconInactive: {
-    tintColor: Palette.textSubtle,
-  },
-  tabLabelActive: {
-    color: Palette.ink,
-    ...Type.label3,
-  },
-  tabLabel: {
-    color: Palette.textSubtle,
-    ...Type.label3,
-  },
-  fab: {
-    alignItems: 'center',
-    backgroundColor: Palette.inkOverlay,
-    borderColor: Palette.white,
-    borderWidth: 1,
-    borderRadius: Radius.pill,
-    height: 64,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: Space.lg,
-    width: 64,
-    ...Shadow.raised,
-  },
-  fabIcon: {
-    height: 28,
-    tintColor: Palette.white,
-    width: 28,
-  },
-  fabPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.95 }],
   },
   pressed: {
     opacity: 0.85,

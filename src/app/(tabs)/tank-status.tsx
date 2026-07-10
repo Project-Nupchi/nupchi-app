@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View, ViewStyle, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Gradient, Palette, Radius, Shadow, Space, Type } from '@/constants/aqua-theme';
+import { FigmaTokens, Gradient, Palette, Radius, Shadow, Space, Type } from '@/constants/aqua-theme';
 import { AppCopy } from '@/constants/copy';
 import {
   Tank,
@@ -16,15 +16,15 @@ import {
 } from '@/domain/aquaculture';
 import { useAquaculture } from '@/state/aquaculture-store';
 
-const cameraImg = require('../../assets/images/home/camera.png');
-const flounderImg = require('../../assets/images/home/flounder.png');
+const plusImg = require('../../../assets/images/home/plus.png');
+const tankThumbnailImg = require('../../../assets/images/home/tank-thumbnail.png');
 const statusIcons: Record<TankStatus, number> = {
-  suspicious: require('../../assets/images/home/status-warn.png'),
-  caution: require('../../assets/images/home/status-suspect.png'),
-  normal: require('../../assets/images/home/status-good.png'),
+  suspicious: require('../../../assets/images/home/status-warn.png'),
+  caution: require('../../../assets/images/home/status-suspect.png'),
+  normal: require('../../../assets/images/home/status-good.png'),
 };
-const tabHomeImg = require('../../assets/images/home/tab-home.png');
-const tabListImg = require('../../assets/images/home/tab-list.png');
+
+const APP_BAR_HEIGHT = Space.lg * 3;
 
 const webBlur =
   Platform.OS === 'web'
@@ -42,36 +42,35 @@ export default function TankStatusScreen() {
     <View style={styles.root}>
       <LinearGradient colors={[...Gradient.colors]} locations={[...Gradient.locations]} style={StyleSheet.absoluteFill} />
       <LinearGradient
-        colors={['rgba(255,255,255,0)', Palette.white]}
+        colors={[FigmaTokens.color.white[0], Palette.white]}
         locations={[0, 1]}
         pointerEvents="none"
         style={styles.backgroundFade}
       />
 
-      <View style={[styles.appBar, { paddingTop: insets.top + 7 }]}>
+      <View style={[styles.appBar, { height: insets.top + APP_BAR_HEIGHT, paddingTop: insets.top }]}>
         <Text selectable style={styles.title}>
           {AppCopy.navigation.tankStatus}
         </Text>
         <Pressable
           accessibilityLabel={AppCopy.navigation.addTank}
           accessibilityRole="button"
+          hitSlop={Space.xs}
           onPress={() => router.push('/add-tank')}
           style={({ pressed }) => [styles.addButton, webBlur, pressed && styles.pressed]}
         >
-          <Text selectable={false} style={styles.addButtonText}>
-            +
-          </Text>
+          <Image source={plusImg} style={styles.plusIcon} contentFit="contain" />
         </Pressable>
       </View>
 
       <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
+        contentInsetAdjustmentBehavior="never"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingBottom: insets.bottom + 144,
-            paddingTop: insets.top + 106,
+            paddingBottom: Space.xl,
+            paddingTop: insets.top + APP_BAR_HEIGHT + Space.md,
           },
         ]}
       >
@@ -82,30 +81,6 @@ export default function TankStatusScreen() {
           })}
         </View>
       </ScrollView>
-
-      <View style={[styles.tabBar, webBlur, { bottom: insets.bottom + Space.lg }]}>
-        <Pressable accessibilityRole="button" onPress={() => router.replace('/')} style={styles.tabItem}>
-          <Image source={tabHomeImg} style={[styles.tabIcon, styles.tabIconInactive]} contentFit="contain" />
-          <Text selectable={false} style={styles.tabLabel}>
-            {AppCopy.navigation.home}
-          </Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" style={[styles.tabItem, styles.tabItemActive]}>
-          <Image source={tabListImg} style={[styles.tabIcon, styles.tabIconActive]} contentFit="contain" />
-          <Text selectable={false} style={styles.tabLabelActive}>
-            {AppCopy.navigation.tankStatus}
-          </Text>
-        </Pressable>
-      </View>
-
-      <Pressable
-        accessibilityLabel={AppCopy.navigation.capture}
-        accessibilityRole="button"
-        onPress={() => router.push('/camera')}
-        style={({ pressed }) => [styles.fab, webBlur, { bottom: insets.bottom + Space.lg }, pressed && styles.fabPressed]}
-      >
-        <Image source={cameraImg} style={styles.fabIcon} contentFit="contain" />
-      </Pressable>
     </View>
   );
 }
@@ -121,7 +96,7 @@ function TankListCard({ tank, status }: { tank: Tank; status: TankStatus }) {
       onPress={() => router.push({ pathname: '/tank/[tankId]', params: { tankId: tank.id } })}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
-      <Image source={flounderImg} style={styles.tankImage} contentFit="cover" />
+      <Image source={tankThumbnailImg} style={styles.tankImage} contentFit="cover" />
       <View style={styles.cardText}>
         <View style={styles.cardTitleRow}>
           <Text selectable style={styles.tankId}>
@@ -136,6 +111,7 @@ function TankListCard({ tank, status }: { tank: Tank; status: TankStatus }) {
           {AppCopy.tank.lastCapture(lastCaptured)}
         </Text>
       </View>
+      <View style={styles.cardBorder} />
     </Pressable>
   );
 }
@@ -192,7 +168,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: Palette.onGradient,
-    ...Type.title,
+    ...Type.appBarTitle,
   },
   addButton: {
     alignItems: 'center',
@@ -202,34 +178,39 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 40,
   },
-  addButtonText: {
-    color: Palette.primaryPressed,
-    fontSize: 28,
-    fontWeight: '300',
-    lineHeight: 34,
-    marginTop: -2,
+  plusIcon: {
+    height: 24,
+    width: 24,
   },
   scrollContent: {
     alignItems: 'center',
     paddingHorizontal: Space.lg,
   },
   list: {
-    gap: 10,
+    gap: Space.sm + Space.xs,
   },
   card: {
     alignItems: 'center',
     backgroundColor: Palette.glass,
-    borderColor: Palette.glassLine,
     borderRadius: Radius.card,
-    borderWidth: 1,
     flexDirection: 'row',
     gap: Space.md,
-    minHeight: 102,
+    minHeight: 104,
     padding: Space.md,
     ...Shadow.card,
   },
+  cardBorder: {
+    bottom: 0,
+    borderColor: Palette.glassLine,
+    borderRadius: Radius.card,
+    borderWidth: 1,
+    left: 0,
+    pointerEvents: 'none',
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
   tankImage: {
-    backgroundColor: 'rgba(228, 199, 154, 0.34)',
     borderRadius: Radius.image,
     height: 56,
     width: 56,
@@ -272,71 +253,6 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     ...Type.label2,
-  },
-  tabBar: {
-    alignItems: 'center',
-    backgroundColor: Palette.glass,
-    borderColor: Palette.glassLine,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: Space.xs,
-    height: 64,
-    left: Space.lg,
-    paddingHorizontal: Space.xs,
-    position: 'absolute',
-    ...Shadow.navigation,
-  },
-  tabItem: {
-    alignItems: 'center',
-    borderRadius: Radius.pill,
-    gap: Space.xxs,
-    height: 56,
-    justifyContent: 'center',
-    width: 80,
-  },
-  tabItemActive: {
-    backgroundColor: Palette.white,
-  },
-  tabIcon: {
-    height: 24,
-    width: 24,
-  },
-  tabIconActive: {
-    tintColor: Palette.ink,
-  },
-  tabIconInactive: {
-    tintColor: Palette.textSubtle,
-  },
-  tabLabelActive: {
-    color: Palette.ink,
-    ...Type.label3,
-  },
-  tabLabel: {
-    color: Palette.textSubtle,
-    ...Type.label3,
-  },
-  fab: {
-    alignItems: 'center',
-    backgroundColor: Palette.inkOverlay,
-    borderColor: Palette.white,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
-    height: 64,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: Space.lg,
-    width: 64,
-    ...Shadow.navigation,
-  },
-  fabIcon: {
-    height: 28,
-    tintColor: Palette.white,
-    width: 28,
-  },
-  fabPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.95 }],
   },
   pressed: {
     opacity: 0.85,

@@ -42,8 +42,7 @@ function RootNavigator() {
         }}
       >
         <Stack.Protected guard={session.isLoggedIn}>
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen name="tank-status" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="tank/[tankId]" options={{ title: '' }} />
           <Stack.Screen name="camera" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
           <Stack.Screen name="result/[resultId]" options={{ title: AppCopy.navigation.result }} />
@@ -51,10 +50,7 @@ function RootNavigator() {
           <Stack.Screen
             name="add-tank"
             options={{
-              title: AppCopy.navigation.addTank,
-              presentation: 'formSheet',
-              sheetGrabberVisible: true,
-              sheetAllowedDetents: [0.6, 0.95],
+              headerShown: false,
             }}
           />
         </Stack.Protected>
