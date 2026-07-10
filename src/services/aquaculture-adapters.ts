@@ -7,12 +7,12 @@ import type {
   SymptomEvidence,
   Tank,
 } from '@/models/aquaculture';
-import { parseDiagnosisResponse } from '@/services/inference';
+import { parseDiagnosisResponse } from '@/services/inference/parsers';
 import type {
   DiagnosisResponse,
   FishDetection,
   FishDiagnosis,
-} from '@/services/inference';
+} from '@/services/inference/types';
 import type {
   AiResultWithPhoto,
   TankGroupRecord,
@@ -69,7 +69,8 @@ export function diagnosisToInspection(
   input: DiagnosisToInspectionInput
 ): InspectionResult {
   const objects = diagnosis.fish.map((fish) => fishToInspectionObject(fish, input));
-  const diseases = unique(objects.flatMap((object) => object.diseases));
+  // Tank-level disease summary comes from the server's deduped, prevalence-ordered list.
+  const diseases = diagnosis.diseaseSummary.map(diseaseLabel);
   const bodyParts = unique(objects.flatMap((object) => object.bodyParts));
   const lesions = objects.flatMap((object) => object.lesions);
 
@@ -124,22 +125,40 @@ export function storedAiResultToInspection(result: AiResultWithPhoto): Inspectio
   });
 }
 
+/**
+ * History has no cropDataUri, only cropPath. Given signed URLs resolved from those paths,
+ * point each object image at its own crop and restore the crop-relative lesion boxes so the
+ * overlay reappears. Missing/failed URLs keep the original-photo fallback and no boxes.
+ */
+export function applyCropUrls(
+  result: InspectionResult,
+  cropUrls: ReadonlyMap<string, string | null>
+): InspectionResult {
+  if (!result.objects) return result;
+  const objects = result.objects.map((object) => {
+    const url = object.cropPath ? cropUrls.get(object.cropPath) : undefined;
+    return url
+      ? { ...object, photoUri: url, lesions: object.cropLesions ?? object.lesions }
+      : object;
+  });
+  return { ...result, objects, lesions: objects.flatMap((object) => object.lesions) };
+}
+
 function fishToInspectionObject(
   fish: FishDiagnosis,
   input: DiagnosisToInspectionInput
 ): InspectionObject {
   const diseaseEvidence: DiseaseEvidence[] = fish.diseases.map((prediction) => ({
     code: prediction.disease,
-    confidence: prediction.confidence,
     label: diseaseLabel(prediction.disease),
   }));
   const symptomEvidence = fish.detections.map(detectionEvidence);
-  // Normalized symptom coordinates are relative to cropDataUri, never to the original photo.
-  const lesions = fish.cropDataUri
-    ? fish.detections.flatMap((detection, index) =>
-        detectionLesion(detection, fish.index, index)
-      )
-    : [];
+  // Normalized symptom coordinates are relative to the fish crop, never to the original photo.
+  // Live (cropDataUri) shows them immediately; history (cropPath→signed URL) restores them in applyCropUrls.
+  const cropLesions = fish.detections.flatMap((detection, index) =>
+    detectionLesion(detection, fish.index, index)
+  );
+  const lesions = fish.cropDataUri ? cropLesions : [];
   const evidenceSummary = buildFishSummary(fish.index, symptomEvidence, diseaseEvidence);
 
   return {
@@ -157,6 +176,8 @@ function fishToInspectionObject(
     symptomEvidence,
     evidenceSummary,
     lesions,
+    cropLesions,
+    cropPath: fish.cropPath,
   };
 }
 

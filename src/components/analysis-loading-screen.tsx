@@ -5,6 +5,7 @@ import {
   AccessibilityInfo,
   Animated,
   Easing,
+  Platform,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -27,6 +28,7 @@ const loadingSpinner = require('../../assets/images/results/analysis-loading-spi
 
 export function AnalysisLoadingScreen() {
   const { height } = useWindowDimensions();
+  const useNativeDriver = Platform.OS !== 'web';
   const [reduceMotion, setReduceMotion] = useState(false);
   const [orbitProgress] = useState(() => new Animated.Value(0));
   const [spinnerProgress] = useState(() => new Animated.Value(0));
@@ -59,7 +61,7 @@ export function AnalysisLoadingScreen() {
         duration: AnalysisLoading.orbitDuration,
         easing: Easing.linear,
         toValue: 1,
-        useNativeDriver: true,
+        useNativeDriver,
       })
     );
     const spinnerAnimation = Animated.loop(
@@ -67,7 +69,7 @@ export function AnalysisLoadingScreen() {
         duration: AnalysisLoading.spinnerDuration,
         easing: Easing.linear,
         toValue: 1,
-        useNativeDriver: true,
+        useNativeDriver,
       })
     );
 
@@ -78,7 +80,7 @@ export function AnalysisLoadingScreen() {
       orbitAnimation.stop();
       spinnerAnimation.stop();
     };
-  }, [orbitProgress, reduceMotion, spinnerProgress]);
+  }, [orbitProgress, reduceMotion, spinnerProgress, useNativeDriver]);
 
   const orbitRotation = orbitProgress.interpolate({
     inputRange: [0, 1],
