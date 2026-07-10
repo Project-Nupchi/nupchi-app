@@ -1,250 +1,522 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { FlounderMark } from '@/components/tank-decor';
-import { Palette, Radius, Space } from '@/constants/aqua-theme';
-import { sortTanksByRisk } from '@/domain/aquaculture';
+import { PhotoReviewScreen } from '@/components/photo-review-screen';
+import { FigmaTokens, Palette, Radius, Shadow, Space, Type } from '@/constants/aqua-theme';
+import { AppCopy } from '@/constants/copy';
 import { useAquaculture } from '@/state/aquaculture-store';
 
-// 카메라 — 프레임 오버레이로 촬영 후 분석 결과로 이동
+// Figma camera design assets (node 202:253)
+const closeImg = require('../../assets/images/camera/close.png');
+const galleryImg = require('../../assets/images/camera/gallery.png');
+const guideFrameImg = require('../../assets/images/camera/guide-frame.png');
+
+type CaptureMode = 'capture' | 'review';
+
+// 카메라 FAB에서 바로 촬영 화면으로 진입한다. 촬영 또는 갤러리 선택을 마친 뒤
+// 실제 사진을 확인하고 수조를 선택한 시점에만 분석을 시작한다.
 export default function CameraScreen() {
   const { tankId } = useLocalSearchParams<{ tankId?: string }>();
-  const { tanks, results, createInspection } = useAquaculture();
+  const { tanks, createInspection } = useAquaculture();
   const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraView>(null);
-  const [permission, requestPermission] = useCameraPermissions();
-  const isWeb = process.env.EXPO_OS === 'web';
-
-  // 선택 수조: 파라미터 우선, 없으면 위험도 상단 수조
-  const selectedTankId = tankId ?? sortTanksByRisk(tanks, results)[0]?.id;
-  const tank = tanks.find((item) => item.id === selectedTankId);
+  const permissionRequestedRef = useRef(false);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const [mode, setMode] = useState<CaptureMode>('capture');
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [selectedTankId, setSelectedTankId] = useState<string | undefined>(tankId);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!isWeb && permission && !permission.granted && permission.canAskAgain) {
-      requestPermission();
+    if (mode !== 'capture') return;
+    if (
+      cameraPermission &&
+      !cameraPermission.granted &&
+      cameraPermission.canAskAgain &&
+      !permissionRequestedRef.current
+    ) {
+      permissionRequestedRef.current = true;
+      requestCameraPermission().catch(() => {
+        setMessage(AppCopy.camera.errors.cameraPermissionRequest);
+      });
     }
-  }, [isWeb, permission, requestPermission]);
+  }, [cameraPermission, mode, requestCameraPermission]);
 
-  const submit = (photoUri?: string) => {
-    if (!selectedTankId) {
-      router.replace('/add-tank');
-      return;
+  const startInspection = async () => {
+    if (!photoUri || !selectedTankId || !tanks.some((tank) => tank.id === selectedTankId)) return;
+
+    setMessage(null);
+    setIsSubmitting(true);
+
+    try {
+      const created = await createInspection({ tankId: selectedTankId, photoUri, clues: [] });
+      if (!created.ok) {
+        setMessage(created.message);
+        return;
+      }
+
+      router.replace({ pathname: '/result/[resultId]', params: { resultId: created.id } });
+    } finally {
+      setIsSubmitting(false);
     }
-    const resultId = createInspection({ tankId: selectedTankId, photoUri, clues: [] });
-    router.replace({ pathname: '/result/[resultId]', params: { resultId } });
+  };
+
+  const pickFromGallery = async () => {
+    if (isSubmitting) return;
+
+    setMessage(null);
+    setIsSubmitting(true);
+
+    try {
+      // The system photo picker does not require full photo-library permission. Requesting it
+      // here can terminate iOS builds whose native Info.plist has not yet been regenerated.
+      // Give iOS one frame to pause the active camera before presenting another native screen.
+      if (Platform.OS === 'ios') {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      }
+
+      const picked = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: false,
+        mediaTypes: ['images'],
+        quality: 0.82,
+        selectionLimit: 1,
+      });
+
+      if (picked.canceled) return;
+
+      const photoUri = picked.assets?.[0]?.uri;
+      if (!photoUri) {
+        setMessage(AppCopy.camera.errors.selectedPhoto);
+        return;
+      }
+
+      setPhotoUri(photoUri);
+      setMode('review');
+    } catch {
+      setMessage(AppCopy.camera.errors.gallery);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const takePhoto = async () => {
-    if (isWeb) {
-      submit('mock://capture-preview');
-      return;
+    if (isSubmitting) return;
+
+    setMessage(null);
+    setIsSubmitting(true);
+
+    try {
+      if (!cameraPermission?.granted) {
+        const permission = await requestCameraPermission();
+        if (!permission.granted) {
+          setMessage(AppCopy.camera.errors.cameraPermission);
+          return;
+        }
+      }
+
+      if (!cameraRef.current || !cameraReady) {
+        setMessage(AppCopy.camera.errors.cameraNotReady);
+        return;
+      }
+
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.82 });
+      if (!photo?.uri) {
+        setMessage(AppCopy.camera.errors.capturedPhoto);
+        return;
+      }
+
+      setPhotoUri(photo.uri);
+      setMode('review');
+    } catch {
+      setMessage(AppCopy.camera.errors.savePhoto);
+    } finally {
+      setIsSubmitting(false);
     }
-    const photo = await cameraRef.current?.takePictureAsync({ quality: 0.82 });
-    submit(photo?.uri);
   };
 
-  const permissionDenied = !isWeb && permission && !permission.granted && !permission.canAskAgain;
+  const returnToCapture = () => {
+    if (isSubmitting) return;
+    setMessage(null);
+    setPhotoUri(null);
+    setCameraReady(false);
+    setMode('capture');
+  };
+
+  if (mode === 'review' && photoUri) {
+    return (
+      <PhotoReviewScreen
+        bottomInset={insets.bottom}
+        isSubmitting={isSubmitting}
+        message={message}
+        onBack={returnToCapture}
+        onNext={startInspection}
+        onSelectTank={setSelectedTankId}
+        photoUri={photoUri}
+        selectedTankId={selectedTankId}
+        tanks={tanks}
+        topInset={insets.top}
+      />
+    );
+  }
 
   return (
-    <View style={styles.root}>
-      {permissionDenied ? (
+    <CameraCaptureView
+      bottomInset={insets.bottom}
+      cameraReady={cameraReady}
+      isSubmitting={isSubmitting}
+      message={message}
+      onCameraReady={() => setCameraReady(true)}
+      onClose={() => router.back()}
+      onMountError={() => setMessage(AppCopy.camera.errors.mountCamera)}
+      onPickFromGallery={pickFromGallery}
+      onRequestPermission={requestCameraPermission}
+      onTakePhoto={takePhoto}
+      permission={cameraPermission}
+      refObject={cameraRef}
+      topInset={insets.top}
+    />
+  );
+}
+
+function CameraCaptureView({
+  bottomInset,
+  cameraReady,
+  isSubmitting,
+  message,
+  onCameraReady,
+  onClose,
+  onMountError,
+  onPickFromGallery,
+  onRequestPermission,
+  onTakePhoto,
+  permission,
+  refObject,
+  topInset,
+}: {
+  bottomInset: number;
+  cameraReady: boolean;
+  isSubmitting: boolean;
+  message: string | null;
+  onCameraReady: () => void;
+  onClose: () => void;
+  onMountError: () => void;
+  onPickFromGallery: () => void;
+  onRequestPermission: () => Promise<unknown>;
+  onTakePhoto: () => void;
+  permission: ReturnType<typeof useCameraPermissions>[0];
+  refObject: RefObject<CameraView | null>;
+  topInset: number;
+}) {
+  const permissionDenied = permission && !permission.granted && !permission.canAskAgain;
+  const permissionNeedsAction = permission && !permission.granted && permission.canAskAgain;
+  const canUseCamera = Boolean(permission?.granted);
+  const canCapture = canUseCamera && cameraReady && !isSubmitting;
+
+  const shutterHint = (() => {
+    if (isSubmitting) return AppCopy.camera.saving;
+    if (!canUseCamera) return AppCopy.camera.waitingPermission;
+    if (!cameraReady) return AppCopy.camera.preparing;
+    return AppCopy.camera.tapToCapture;
+  })();
+
+  const renderCameraState = () => {
+    if (permissionDenied) {
+      return (
+        <PermissionState
+          body={AppCopy.camera.permissionDeniedBody}
+          buttonLabel={AppCopy.camera.gallery}
+          onPress={onPickFromGallery}
+        />
+      );
+    }
+
+    if (permissionNeedsAction) {
+      return (
+        <PermissionState
+          body={AppCopy.camera.permissionBody}
+          buttonLabel={AppCopy.camera.requestPermission}
+          onPress={onRequestPermission}
+        />
+      );
+    }
+
+    if (!canUseCamera) {
+      return (
         <View style={styles.permissionBox}>
-          <Text selectable style={styles.permissionTitle}>
-            카메라 권한이 필요합니다
-          </Text>
+          <ActivityIndicator color={Palette.white} />
           <Text selectable style={styles.permissionBody}>
-            설정에서 카메라 접근을 허용한 뒤 다시 촬영하세요.
+            {AppCopy.camera.checkingPermission}
           </Text>
         </View>
-      ) : isWeb ? (
-        <View style={styles.mockPreview}>
-          <FlounderMark width={240} color="rgba(228, 199, 154, 0.9)" />
-        </View>
-      ) : (
-        <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
-      )}
+      );
+    }
 
-      {/* 촬영 프레임 오버레이 */}
-      <View pointerEvents="none" style={styles.overlay}>
-        <View style={styles.frame}>
-          <View style={[styles.corner, styles.cornerTL]} />
-          <View style={[styles.corner, styles.cornerTR]} />
-          <View style={[styles.corner, styles.cornerBL]} />
-          <View style={[styles.corner, styles.cornerBR]} />
-        </View>
-        <View style={styles.guideChip}>
-          <Text selectable={false} style={styles.guideText}>
-            광어 한 마리를 프레임 안에 근접·전체로
-          </Text>
-        </View>
-      </View>
+    return (
+      <CameraView
+        active={!isSubmitting}
+        ref={refObject}
+        facing="back"
+        onCameraReady={onCameraReady}
+        onMountError={onMountError}
+        style={StyleSheet.absoluteFill}
+      />
+    );
+  };
 
-      {/* 상단바 */}
-      <View style={[styles.topBar, { paddingTop: insets.top + Space.sm }]}>
-        <Pressable accessibilityLabel="닫기" accessibilityRole="button" onPress={() => router.back()} style={styles.closeButton}>
-          <View style={styles.closeX1} />
-          <View style={styles.closeX2} />
-        </Pressable>
-        <View style={styles.tankPill}>
-          <Text selectable style={styles.tankPillText}>
-            {selectedTankId ?? '수조 없음'} · {tank?.groupId ?? '수조군'}
-          </Text>
-        </View>
-      </View>
+  return (
+    <View style={styles.cameraRoot}>
+      {renderCameraState()}
 
-      {/* 셔터 */}
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + Space.xl }]}>
+      <View style={[styles.cameraTopBar, { top: topInset }]}>
         <Pressable
-          accessibilityLabel="촬영"
+          accessibilityLabel={AppCopy.camera.close}
           accessibilityRole="button"
-          onPress={takePhoto}
-          style={({ pressed }) => [styles.shutter, pressed && styles.shutterPressed]}
+          disabled={isSubmitting}
+          hitSlop={Space.sm}
+          onPress={onClose}
+          style={({ pressed }) => [styles.closeButton, pressed && styles.controlPressed]}
         >
-          <View style={styles.shutterInner} />
+          <Image contentFit="contain" source={closeImg} style={styles.closeIcon} />
         </Pressable>
-        <Text selectable style={styles.shutterHint}>
-          {isWeb ? '샘플 촬영 (웹 미리보기)' : '탭하여 촬영'}
-        </Text>
+      </View>
+
+      {message ? (
+        <View style={[styles.cameraMessageBanner, { top: topInset + CAMERA_APP_BAR_HEIGHT + Space.sm }]}>
+          <Text selectable style={styles.cameraMessageText}>
+            {message}
+          </Text>
+        </View>
+      ) : null}
+
+      <View pointerEvents="none" style={styles.guideOverlay}>
+        <Image contentFit="contain" source={guideFrameImg} style={styles.guideFrame} />
+        <View style={[styles.guideChip, guideBlur]}>
+          <Text selectable={false} style={styles.guideText}>
+            {AppCopy.camera.framingGuide}
+          </Text>
+        </View>
+      </View>
+
+      <View style={[styles.bottomBar, { bottom: bottomInset + Space.sm }]}>
+        <Pressable
+          accessibilityLabel={AppCopy.camera.gallery}
+          accessibilityRole="button"
+          disabled={isSubmitting}
+          onPress={onPickFromGallery}
+          style={({ pressed }) => [
+            styles.galleryButton,
+            isSubmitting && styles.disabled,
+            pressed && !isSubmitting && styles.controlPressed,
+          ]}
+        >
+          <Image contentFit="contain" source={galleryImg} style={styles.galleryIcon} />
+        </Pressable>
+
+        <View style={styles.shutterBlock}>
+          <Pressable
+            accessibilityLabel={AppCopy.navigation.capture}
+            accessibilityRole="button"
+            disabled={!canCapture}
+            onPress={onTakePhoto}
+            style={({ pressed }) => [
+              styles.shutter,
+              !canCapture && styles.disabled,
+              pressed && canCapture && styles.shutterPressed,
+            ]}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color={Palette.inkStrong} />
+            ) : (
+              <View style={styles.shutterInner} />
+            )}
+          </Pressable>
+          <Text selectable style={styles.shutterHint}>
+            {shutterHint}
+          </Text>
+        </View>
+
+        <View style={styles.galleryButtonPlaceholder} />
       </View>
     </View>
   );
 }
 
-const CORNER = 28;
+function PermissionState({
+  body,
+  buttonLabel,
+  onPress,
+}: {
+  body: string;
+  buttonLabel: string;
+  onPress: () => void | Promise<unknown>;
+}) {
+  return (
+    <View style={styles.permissionBox}>
+      <Text selectable style={styles.permissionTitle}>
+        {AppCopy.camera.permissionTitle}
+      </Text>
+      <Text selectable style={styles.permissionBody}>
+        {body}
+      </Text>
+      <Pressable accessibilityRole="button" onPress={onPress} style={styles.cameraFallbackButton}>
+        <Text selectable={false} style={styles.cameraFallbackButtonText}>
+          {buttonLabel}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+const CAMERA_APP_BAR_HEIGHT = Space.lg * 3;
+const GUIDE_ASPECT_RATIO = 275 / 168;
+const SHUTTER_SIZE = 78;
+const SHUTTER_INNER_SIZE = 56;
+const GALLERY_BUTTON_SIZE = 64;
+
+const guideBlur =
+  Platform.OS === 'web'
+    ? ({ backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)' } as unknown as ViewStyle)
+    : null;
 
 const styles = StyleSheet.create({
-  root: {
+  cameraRoot: {
     backgroundColor: Palette.inkStrong,
     flex: 1,
+    overflow: 'hidden',
   },
-  mockPreview: {
+  cameraTopBar: {
     alignItems: 'center',
-    backgroundColor: '#0F2A3C',
-    bottom: 0,
+    flexDirection: 'row',
+    height: CAMERA_APP_BAR_HEIGHT,
+    left: 0,
+    paddingHorizontal: Space.sm + Space.xxs,
+    position: 'absolute',
+    right: 0,
+    zIndex: 5,
+  },
+  closeButton: {
+    alignItems: 'center',
+    height: 44,
     justifyContent: 'center',
+    width: 44,
+  },
+  closeIcon: {
+    height: 24,
+    width: 24,
+  },
+  cameraMessageBanner: {
+    backgroundColor: FigmaTokens.color.gray[900],
+    borderColor: FigmaTokens.color.white[20],
+    borderRadius: Radius.button,
+    borderWidth: 1,
+    left: Space.lg,
+    paddingHorizontal: Space.sm + Space.xs,
+    paddingVertical: Space.sm,
+    position: 'absolute',
+    right: Space.lg,
+    zIndex: 6,
+  },
+  cameraMessageText: {
+    color: Palette.white,
+    textAlign: 'center',
+    ...Type.body2,
+  },
+  guideOverlay: {
+    alignItems: 'center',
     left: 0,
     position: 'absolute',
     right: 0,
-    top: 0,
+    top: '36.7%',
+    zIndex: 2,
   },
-  overlay: {
-    alignItems: 'center',
-    bottom: 0,
-    justifyContent: 'center',
-    left: 0,
-    padding: Space.xl,
-    position: 'absolute',
-    right: 0,
-    top: 0,
+  guideFrame: {
+    aspectRatio: GUIDE_ASPECT_RATIO,
+    maxWidth: 275,
+    width: '70%',
   },
-  frame: {
-    aspectRatio: 1.4,
-    width: '88%',
-  },
-  corner: {
-    borderColor: Palette.white,
-    height: CORNER,
-    position: 'absolute',
-    width: CORNER,
-  },
-  cornerTL: { borderLeftWidth: 3, borderTopWidth: 3, borderTopLeftRadius: 8, left: 0, top: 0 },
-  cornerTR: { borderRightWidth: 3, borderTopWidth: 3, borderTopRightRadius: 8, right: 0, top: 0 },
-  cornerBL: { borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 8, bottom: 0, left: 0 },
-  cornerBR: { borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: 8, bottom: 0, right: 0 },
   guideChip: {
-    backgroundColor: 'rgba(12, 30, 44, 0.66)',
-    borderRadius: Radius.pill,
-    marginTop: Space.lg,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
+    alignItems: 'center',
+    backgroundColor: FigmaTokens.color.gray[500],
+    borderRadius: Radius.button,
+    justifyContent: 'center',
+    marginTop: Space.md + Space.sm,
+    maxWidth: '90%',
+    paddingHorizontal: Space.sm + Space.xs,
+    paddingVertical: Space.sm,
   },
   guideText: {
     color: Palette.white,
-    fontSize: 13,
-    fontWeight: '700',
+    textAlign: 'center',
+    ...Type.body2,
   },
-  topBar: {
-    alignItems: 'center',
+  bottomBar: {
+    alignItems: 'flex-end',
     flexDirection: 'row',
     justifyContent: 'space-between',
     left: 0,
     paddingHorizontal: Space.lg,
     position: 'absolute',
     right: 0,
-    top: 0,
+    zIndex: 5,
   },
-  closeButton: {
+  galleryButton: {
     alignItems: 'center',
-    backgroundColor: 'rgba(12, 30, 44, 0.55)',
-    borderRadius: Radius.pill,
-    height: 44,
-    justifyContent: 'center',
-    width: 44,
-  },
-  closeX1: {
-    backgroundColor: Palette.white,
-    borderRadius: 2,
-    height: 2.5,
-    position: 'absolute',
-    transform: [{ rotate: '45deg' }],
-    width: 18,
-  },
-  closeX2: {
-    backgroundColor: Palette.white,
-    borderRadius: 2,
-    height: 2.5,
-    position: 'absolute',
-    transform: [{ rotate: '-45deg' }],
-    width: 18,
-  },
-  tankPill: {
-    backgroundColor: 'rgba(12, 30, 44, 0.55)',
-    borderColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: FigmaTokens.color.white[20],
+    borderColor: FigmaTokens.color.white[30],
     borderRadius: Radius.pill,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    height: GALLERY_BUTTON_SIZE,
+    justifyContent: 'center',
+    marginBottom: Space.lg,
+    width: GALLERY_BUTTON_SIZE,
+    ...Shadow.navigation,
   },
-  tankPillText: {
-    color: Palette.white,
-    fontSize: 14,
-    fontWeight: '700',
+  galleryIcon: {
+    height: 28,
+    width: 28,
   },
-  bottomBar: {
+  galleryButtonPlaceholder: {
+    height: GALLERY_BUTTON_SIZE,
+    marginBottom: Space.lg,
+    width: GALLERY_BUTTON_SIZE,
+  },
+  shutterBlock: {
     alignItems: 'center',
-    bottom: 0,
-    gap: Space.sm,
-    left: 0,
-    position: 'absolute',
-    right: 0,
+    gap: Space.sm - Space.xxs,
+    width: SHUTTER_SIZE,
   },
   shutter: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: FigmaTokens.color.white[20],
     borderColor: Palette.white,
     borderRadius: Radius.pill,
-    borderWidth: 4,
-    height: 78,
+    borderWidth: 5,
+    height: SHUTTER_SIZE,
     justifyContent: 'center',
-    width: 78,
+    width: SHUTTER_SIZE,
   },
   shutterPressed: {
-    opacity: 0.7,
+    opacity: 0.72,
     transform: [{ scale: 0.94 }],
   },
   shutterInner: {
     backgroundColor: Palette.white,
     borderRadius: Radius.pill,
-    height: 58,
-    width: 58,
+    height: SHUTTER_INNER_SIZE,
+    width: SHUTTER_INNER_SIZE,
   },
   shutterHint: {
-    color: Palette.inkMuted,
-    fontSize: 13,
-    fontWeight: '600',
+    color: Palette.white,
+    textAlign: 'center',
+    width: SHUTTER_SIZE,
+    ...Type.caption,
   },
   permissionBox: {
     alignItems: 'center',
@@ -255,18 +527,36 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 0,
+    zIndex: 3,
   },
   permissionTitle: {
     color: Palette.white,
-    fontSize: 22,
-    fontWeight: '800',
     textAlign: 'center',
+    ...Type.heading1,
   },
   permissionBody: {
     color: Palette.inkMuted,
-    fontSize: 15,
-    lineHeight: 22,
     marginTop: Space.sm,
     textAlign: 'center',
+    ...Type.body2,
+  },
+  cameraFallbackButton: {
+    backgroundColor: Palette.white,
+    borderRadius: Radius.button,
+    marginTop: Space.lg,
+    minHeight: 48,
+    paddingHorizontal: Space.lg,
+    paddingVertical: 13,
+  },
+  cameraFallbackButtonText: {
+    color: Palette.inkStrong,
+    ...Type.button,
+  },
+  disabled: {
+    opacity: 0.48,
+  },
+  controlPressed: {
+    opacity: 0.78,
+    transform: [{ scale: 0.96 }],
   },
 });

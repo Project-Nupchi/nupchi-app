@@ -5,6 +5,7 @@ node_modules/
 
 # Expo
 .expo/
+.vercel/
 dist/
 web-build/
 expo-env.d.ts
@@ -30,6 +31,9 @@ yarn-error.*
 .DS_Store
 *.pem
 
+# local IDE files
+.idea/
+
 # local env files
 .env*.local
 
@@ -41,3 +45,8 @@ example
 # generated native folders
 /ios
 /android
+/build/
+
+# generated artifacts
+/generated/
+/tmp/

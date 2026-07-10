@@ -1,0 +1,289 @@
+{
+  "initialTanks": [
+    {
+      "id": "A-07",
+      "groupId": "1계통",
+      "stockedInfo": "광어 18,000미, 입식 42일차",
+      "createdAt": "2026-07-01T08:20:00.000Z",
+      "active": true
+    },
+    {
+      "id": "A-08",
+      "groupId": "1계통",
+      "stockedInfo": "광어 17,600미, 입식 42일차",
+      "createdAt": "2026-06-15T07:10:00.000Z",
+      "active": true
+    },
+    {
+      "id": "B-03",
+      "groupId": "2계통",
+      "stockedInfo": "광어 15,200미, 입식 31일차",
+      "createdAt": "2026-07-03T10:00:00.000Z",
+      "active": true
+    }
+  ],
+  "initialResults": [
+    {
+      "id": "R-A07-003",
+      "tankId": "A-07",
+      "capturedAt": "2026-07-08T08:32:00.000Z",
+      "status": "completed",
+      "grade": "suspicious",
+      "photoUri": "mock://a07-scan",
+      "clues": ["무리 이탈", "체색"],
+      "bodyParts": ["체표", "지느러미 기부"],
+      "diseases": ["연쇄구균증", "비브리오병"],
+      "evidenceSummary": "체표 측면의 출혈성 병변 후보와 지느러미 변색이 함께 감지됐어요.",
+      "lesions": [
+        { "id": "l1", "x": 28, "y": 33, "width": 20, "height": 16, "label": "체표 홍반" },
+        { "id": "l2", "x": 58, "y": 48, "width": 16, "height": 14, "label": "기부 변색" }
+      ],
+      "objects": [
+        {
+          "id": "obj-a07-1",
+          "grade": "suspicious",
+          "photoUri": "mock://a07-object-1",
+          "bodyParts": ["체표"],
+          "diseases": ["연쇄구균증"],
+          "evidenceSummary": "1번 개체 체표 측면에서 출혈성 병변 후보가 감지되었습니다.",
+          "lesions": [{ "id": "l1", "x": 28, "y": 33, "width": 20, "height": 16, "label": "체표 홍반" }]
+        },
+        {
+          "id": "obj-a07-2",
+          "grade": "suspicious",
+          "photoUri": "mock://a07-object-2",
+          "bodyParts": ["지느러미 기부"],
+          "diseases": ["비브리오병"],
+          "evidenceSummary": "2번 개체 지느러미 기부에서 변색 후보가 감지되었습니다.",
+          "lesions": [{ "id": "l2", "x": 58, "y": 48, "width": 16, "height": 14, "label": "기부 변색" }]
+        },
+        {
+          "id": "obj-a07-3",
+          "grade": "normal",
+          "photoUri": "mock://a07-object-3",
+          "bodyParts": ["체표"],
+          "diseases": [],
+          "evidenceSummary": "3번 개체에서는 명확한 병변 후보가 감지되지 않았습니다.",
+          "lesions": []
+        },
+        {
+          "id": "obj-a07-4",
+          "grade": "suspicious",
+          "photoUri": "mock://a07-object-4",
+          "bodyParts": ["체표"],
+          "diseases": ["연쇄구균증"],
+          "evidenceSummary": "4번 개체 체표 측면에서 홍반 후보가 감지되었습니다.",
+          "lesions": [{ "id": "l4", "x": 42, "y": 43, "width": 21, "height": 22, "label": "체표 홍반" }]
+        },
+        {
+          "id": "obj-a07-5",
+          "grade": "normal",
+          "photoUri": "mock://a07-object-5",
+          "bodyParts": ["체표"],
+          "diseases": [],
+          "evidenceSummary": "5번 개체에서는 명확한 병변 후보가 감지되지 않았습니다.",
+          "lesions": []
+        },
+        {
+          "id": "obj-a07-6",
+          "grade": "normal",
+          "photoUri": "mock://a07-object-6",
+          "bodyParts": ["체표"],
+          "diseases": [],
+          "evidenceSummary": "6번 개체에서는 명확한 병변 후보가 감지되지 않았습니다.",
+          "lesions": []
+        },
+        {
+          "id": "obj-a07-7",
+          "grade": "normal",
+          "photoUri": "mock://a07-object-7",
+          "bodyParts": ["체표"],
+          "diseases": [],
+          "evidenceSummary": "7번 개체에서는 명확한 병변 후보가 감지되지 않았습니다.",
+          "lesions": []
+        },
+        {
+          "id": "obj-a07-8",
+          "grade": "normal",
+          "photoUri": "mock://a07-object-8",
+          "bodyParts": ["체표"],
+          "diseases": [],
+          "evidenceSummary": "8번 개체에서는 명확한 병변 후보가 감지되지 않았습니다.",
+          "lesions": []
+        },
+        {
+          "id": "obj-a07-9",
+          "grade": "normal",
+          "photoUri": "mock://a07-object-9",
+          "bodyParts": ["체표"],
+          "diseases": [],
+          "evidenceSummary": "9번 개체에서는 명확한 병변 후보가 감지되지 않았습니다.",
+          "lesions": []
+        },
+        {
+          "id": "obj-a07-10",
+          "grade": "normal",
+          "photoUri": "mock://a07-object-10",
+          "bodyParts": ["체표"],
+          "diseases": [],
+          "evidenceSummary": "10번 개체에서는 명확한 병변 후보가 감지되지 않았습니다.",
+          "lesions": []
+        }
+      ]
+    },
+    {
+      "id": "R-A07-002",
+      "tankId": "A-07",
+      "capturedAt": "2026-07-07T08:10:00.000Z",
+      "status": "completed",
+      "grade": "caution",
+      "clues": ["섭이"],
+      "bodyParts": ["체표"],
+      "diseases": ["림포시스티스병"],
+      "evidenceSummary": "작은 표피 손상 후보가 있으나 경계가 약해요. 동일 개체 재촬영을 권장드려요.",
+      "lesions": [{ "id": "l1", "x": 46, "y": 38, "width": 12, "height": 10, "label": "약한 반점" }],
+      "objects": [
+        {
+          "id": "obj-a07-prev-1",
+          "grade": "suspicious",
+          "bodyParts": ["체표"],
+          "diseases": ["림포시스티스병"],
+          "evidenceSummary": "1번 개체 체표에서 약한 반점 후보가 감지되었습니다.",
+          "lesions": [{ "id": "l1", "x": 46, "y": 38, "width": 12, "height": 10, "label": "약한 반점" }]
+        }
+      ]
+    },
+    {
+      "id": "R-B03-002",
+      "tankId": "A-08",
+      "capturedAt": "2026-07-08T07:54:00.000Z",
+      "status": "completed",
+      "grade": "normal",
+      "clues": [],
+      "bodyParts": ["체표"],
+      "diseases": [],
+      "evidenceSummary": "명확한 병변 후보가 감지되지 않았습니다.",
+      "lesions": [],
+      "objects": [
+        {
+          "id": "obj-a08-1",
+          "grade": "normal",
+          "bodyParts": ["체표"],
+          "diseases": [],
+          "evidenceSummary": "1번 개체에서는 명확한 병변 후보가 감지되지 않았습니다.",
+          "lesions": []
+        },
+        {
+          "id": "obj-a08-2",
+          "grade": "normal",
+          "bodyParts": ["체표"],
+          "diseases": [],
+          "evidenceSummary": "2번 개체에서도 특이 소견이 보이지 않습니다.",
+          "lesions": []
+        }
+      ]
+    },
+    {
+      "id": "R-B03-001",
+      "tankId": "B-03",
+      "capturedAt": "2026-07-07T16:20:00.000Z",
+      "status": "completed",
+      "grade": "caution",
+      "clues": ["부상"],
+      "bodyParts": ["꼬리지느러미"],
+      "diseases": ["스쿠티카병"],
+      "evidenceSummary": "꼬리지느러미 가장자리에 국소 손상 후보가 있습니다. 재촬영과 이력 관찰이 필요합니다.",
+      "lesions": [{ "id": "l1", "x": 68, "y": 42, "width": 12, "height": 13, "label": "지느러미 손상" }],
+      "objects": [
+        {
+          "id": "obj-b03-1",
+          "grade": "suspicious",
+          "bodyParts": ["꼬리지느러미"],
+          "diseases": ["스쿠티카병"],
+          "evidenceSummary": "1번 개체 꼬리지느러미 가장자리에서 국소 손상 후보가 감지되었습니다.",
+          "lesions": [{ "id": "l1", "x": 68, "y": 42, "width": 12, "height": 13, "label": "지느러미 손상" }]
+        }
+      ]
+    }
+  ],
+  "demoVerdicts": [
+    {
+      "grade": "suspicious",
+      "bodyParts": ["체표", "지느러미"],
+      "diseases": ["스쿠티카병"],
+      "evidenceSummary": "체표에 붉은 반점(출혈성 병변) 후보가 감지되었습니다. 스쿠티카병 초기 신호와 유사해 같은 수조군 관찰과 전문가 확인이 필요합니다.",
+      "lesions": [
+        { "id": "l1", "x": 34, "y": 30, "width": 22, "height": 20, "label": "붉은 반점" },
+        { "id": "l2", "x": 60, "y": 50, "width": 14, "height": 12, "label": "지느러미 손상" }
+      ],
+      "objects": [
+        {
+          "id": "obj-demo-1",
+          "grade": "suspicious",
+          "bodyParts": ["체표"],
+          "diseases": ["스쿠티카병"],
+          "evidenceSummary": "1번 개체 체표에 붉은 반점 후보가 감지되었습니다.",
+          "lesions": [{ "id": "l1", "x": 34, "y": 30, "width": 22, "height": 20, "label": "붉은 반점" }]
+        },
+        {
+          "id": "obj-demo-2",
+          "grade": "suspicious",
+          "bodyParts": ["지느러미"],
+          "diseases": ["스쿠티카병"],
+          "evidenceSummary": "2번 개체 지느러미 손상 후보가 감지되었습니다.",
+          "lesions": [{ "id": "l2", "x": 60, "y": 50, "width": 14, "height": 12, "label": "지느러미 손상" }]
+        },
+        {
+          "id": "obj-demo-3",
+          "grade": "normal",
+          "bodyParts": ["체표"],
+          "diseases": [],
+          "evidenceSummary": "3번 개체에서는 명확한 병변 후보가 감지되지 않았습니다.",
+          "lesions": []
+        }
+      ]
+    },
+    {
+      "grade": "caution",
+      "bodyParts": ["체표"],
+      "diseases": ["림포시스티스병"],
+      "evidenceSummary": "작은 표피 이상 후보가 있으나 경계가 약합니다. 동일 개체를 24시간 내 재촬영해 진행 여부를 확인하세요.",
+      "lesions": [{ "id": "l1", "x": 44, "y": 36, "width": 14, "height": 11, "label": "약한 반점" }],
+      "objects": [
+        {
+          "id": "obj-demo-caution-1",
+          "grade": "suspicious",
+          "bodyParts": ["체표"],
+          "diseases": ["림포시스티스병"],
+          "evidenceSummary": "1번 개체에서 작은 표피 이상 후보가 감지되었습니다.",
+          "lesions": [{ "id": "l1", "x": 44, "y": 36, "width": 14, "height": 11, "label": "약한 반점" }]
+        }
+      ]
+    },
+    {
+      "grade": "normal",
+      "bodyParts": ["체표"],
+      "diseases": [],
+      "evidenceSummary": "명확한 병변 후보가 감지되지 않았습니다. 정기 추적 촬영을 유지하세요.",
+      "lesions": [],
+      "objects": [
+        {
+          "id": "obj-demo-normal-1",
+          "grade": "normal",
+          "bodyParts": ["체표"],
+          "diseases": [],
+          "evidenceSummary": "1번 개체에서는 명확한 병변 후보가 감지되지 않았습니다.",
+          "lesions": []
+        },
+        {
+          "id": "obj-demo-normal-2",
+          "grade": "normal",
+          "bodyParts": ["체표"],
+          "diseases": [],
+          "evidenceSummary": "2번 개체에서도 특이 소견이 보이지 않습니다.",
+          "lesions": []
+        }
+      ]
+    }
+  ]
+}

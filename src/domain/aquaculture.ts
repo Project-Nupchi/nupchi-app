@@ -1,43 +1,29 @@
-export type TankStatus = 'normal' | 'caution' | 'suspicious';
-export type InspectionStatus = 'pending' | 'completed' | 'failed';
+import { AppCopy, StatusCopy } from '@/constants/copy';
+import type { InspectionResult, Tank, TankStatus } from '@/models/aquaculture';
 
-export type LesionBox = {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  label: string;
-};
-
-export type Tank = {
-  id: string;
-  groupId: string;
-  stockedInfo: string;
-  createdAt: string;
-  // 출하 완료 등으로 비활성화된 수조 (기록·이력은 보존, 목록에선 뮤트)
-  active: boolean;
-};
-
-export type InspectionResult = {
-  id: string;
-  tankId: string;
-  capturedAt: string;
-  status: InspectionStatus;
-  grade: TankStatus;
-  photoUri?: string;
-  clues: string[];
-  bodyParts: string[];
-  diseases: string[];
-  evidenceSummary: string;
-  lesions: LesionBox[];
-};
+export type {
+  AquacultureSnapshot,
+  CreateInspectionInput,
+  CreateTankInput,
+  InspectionId,
+  InspectionObject,
+  InspectionResult,
+  InspectionStatus,
+  LesionBox,
+  LoginInput,
+  LoginResponse,
+  MutationResult,
+  ObjectInspectionStatus,
+  Tank,
+  TankId,
+  TankStatus,
+  UpdateTankInput,
+  UserSession,
+} from '@/models/aquaculture';
 
 // 디자인 언어: 양호(초록) / 의심(주황) / 경고(빨강)
 export const statusLabel: Record<TankStatus, string> = {
-  normal: '양호',
-  caution: '의심',
-  suspicious: '경고',
+  ...StatusCopy,
 };
 
 export const statusWeight: Record<TankStatus, number> = {
@@ -58,91 +44,14 @@ export const flounderDiseaseLabels = [
   '에드워드병',
 ] as const;
 
-export const initialTanks: Tank[] = [
-  {
-    id: 'A-07',
-    groupId: '1계통',
-    stockedInfo: '광어 18,000미, 입식 42일차',
-    createdAt: '2026-07-01T08:20:00.000Z',
-    active: true,
-  },
-  {
-    id: 'A-08',
-    groupId: '1계통',
-    stockedInfo: '광어 17,600미, 입식 42일차',
-    createdAt: '2026-06-15T07:10:00.000Z',
-    active: true,
-  },
-  {
-    id: 'B-03',
-    groupId: '2계통',
-    stockedInfo: '광어 15,200미, 입식 31일차',
-    createdAt: '2026-07-03T10:00:00.000Z',
-    active: true,
-  },
-];
-
-export const initialResults: InspectionResult[] = [
-  {
-    id: 'R-A07-003',
-    tankId: 'A-07',
-    capturedAt: '2026-07-08T08:32:00.000Z',
-    status: 'completed',
-    grade: 'suspicious',
-    clues: ['무리 이탈', '체색'],
-    bodyParts: ['체표', '지느러미 기부'],
-    diseases: ['연쇄구균증', '비브리오병'],
-    evidenceSummary: '체표 측면의 출혈성 병변 후보와 지느러미 기부 변색이 함께 감지되었습니다.',
-    lesions: [
-      { id: 'l1', x: 28, y: 33, width: 20, height: 16, label: '체표 홍반' },
-      { id: 'l2', x: 58, y: 48, width: 16, height: 14, label: '기부 변색' },
-    ],
-  },
-  {
-    id: 'R-A07-002',
-    tankId: 'A-07',
-    capturedAt: '2026-07-07T08:10:00.000Z',
-    status: 'completed',
-    grade: 'caution',
-    clues: ['섭이'],
-    bodyParts: ['체표'],
-    diseases: ['림포시스티스병'],
-    evidenceSummary: '작은 표피 손상 후보가 있으나 경계가 약합니다. 동일 개체 재촬영을 권장합니다.',
-    lesions: [{ id: 'l1', x: 46, y: 38, width: 12, height: 10, label: '약한 반점' }],
-  },
-  {
-    id: 'R-B03-002',
-    tankId: 'A-08',
-    capturedAt: '2026-07-08T07:54:00.000Z',
-    status: 'completed',
-    grade: 'normal',
-    clues: [],
-    bodyParts: ['체표'],
-    diseases: [],
-    evidenceSummary: '명확한 병변 후보가 감지되지 않았습니다.',
-    lesions: [],
-  },
-  {
-    id: 'R-B03-001',
-    tankId: 'B-03',
-    capturedAt: '2026-07-07T16:20:00.000Z',
-    status: 'completed',
-    grade: 'caution',
-    clues: ['부상'],
-    bodyParts: ['꼬리지느러미'],
-    diseases: ['스쿠티카병'],
-    evidenceSummary: '꼬리지느러미 가장자리에 국소 손상 후보가 있습니다. 재촬영과 이력 관찰이 필요합니다.',
-    lesions: [{ id: 'l1', x: 68, y: 42, width: 12, height: 13, label: '지느러미 손상' }],
-  },
-];
-
 export function formatDateTime(value: string) {
   return new Intl.DateTimeFormat('ko-KR', {
     timeZone: 'Asia/Seoul',
-    month: '2-digit',
-    day: '2-digit',
+    month: 'long',
+    day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    hour12: true,
   }).format(new Date(value));
 }
 
@@ -153,7 +62,7 @@ export function getTankResults(results: InspectionResult[], tankId: string) {
 }
 
 export function getCurrentStatus(results: InspectionResult[], tankId: string): TankStatus {
-  return getTankResults(results, tankId)[0]?.grade ?? 'normal';
+  return getTankResults(results, tankId).find((result) => result.status === 'completed')?.grade ?? 'normal';
 }
 
 export function getTankGroupStatus(tanks: Tank[], results: InspectionResult[], tank: Tank): TankStatus {
@@ -253,7 +162,7 @@ export function buildCompletedInspection(result: InspectionResult): InspectionRe
       grade,
       bodyParts: ['체표'],
       diseases: [],
-      evidenceSummary: '명확한 병변 후보가 감지되지 않았습니다. 정기 추적 촬영을 유지하세요.',
+      evidenceSummary: AppCopy.prototype.normalSummary,
       lesions: [],
     };
   }
@@ -265,8 +174,8 @@ export function buildCompletedInspection(result: InspectionResult): InspectionRe
       grade,
       bodyParts: ['체표'],
       diseases: ['림포시스티스병'],
-      evidenceSummary: '작은 병변 후보가 있으나 경계가 약합니다. 동일 수조를 24시간 내 재촬영하세요.',
-      lesions: [{ id: 'l1', x: 42, y: 36, width: 14, height: 11, label: '약한 병변' }],
+      evidenceSummary: AppCopy.prototype.cautionSummary,
+      lesions: [{ id: 'l1', x: 42, y: 36, width: 14, height: 11, label: AppCopy.prototype.weakLesion }],
     };
   }
 
@@ -276,10 +185,10 @@ export function buildCompletedInspection(result: InspectionResult): InspectionRe
     grade,
     bodyParts: ['체표', '지느러미 기부'],
     diseases: ['연쇄구균증', '비브리오병'],
-    evidenceSummary: '붉은 반점과 기부 변색 후보가 함께 감지되었습니다. 같은 수조군 격리 관찰과 전문가 확인이 필요합니다.',
+    evidenceSummary: AppCopy.prototype.suspiciousSummary,
     lesions: [
-      { id: 'l1', x: 31, y: 35, width: 18, height: 15, label: '홍반 후보' },
-      { id: 'l2', x: 56, y: 51, width: 17, height: 13, label: '변색 후보' },
+      { id: 'l1', x: 31, y: 35, width: 18, height: 15, label: AppCopy.prototype.erythemaCandidate },
+      { id: 'l2', x: 56, y: 51, width: 17, height: 13, label: AppCopy.prototype.discolorationCandidate },
     ],
   };
 }

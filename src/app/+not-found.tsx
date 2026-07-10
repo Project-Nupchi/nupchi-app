@@ -5,18 +5,19 @@ import { ActionButton } from '@/components/action-button';
 import { GlassCard } from '@/components/glass-card';
 import { ScreenShell } from '@/components/screen-shell';
 import { Palette, Space } from '@/constants/aqua-theme';
+import { AppCopy } from '@/constants/copy';
 
 export default function NotFoundScreen() {
   return (
     <ScreenShell contentStyle={styles.content}>
       <GlassCard style={styles.panel}>
         <Text selectable style={styles.title}>
-          화면을 찾을 수 없습니다
+          {AppCopy.notFound.title}
         </Text>
         <Text selectable style={styles.body}>
-          요청한 경로가 앱의 수조 점검 흐름에 없습니다.
+          {AppCopy.notFound.body}
         </Text>
-        <ActionButton label="홈으로" icon="house" onPress={() => router.replace('/')} />
+        <ActionButton label={AppCopy.common.home} icon="house" onPress={() => router.replace('/')} />
       </GlassCard>
     </ScreenShell>
   );

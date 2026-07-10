@@ -8,13 +8,8 @@ import { ScreenShell } from '@/components/screen-shell';
 import { Section } from '@/components/section';
 import { StatusBadge } from '@/components/status-badge';
 import { Palette, Radius, Space } from '@/constants/aqua-theme';
+import { AppCopy } from '@/constants/copy';
 import { useAquaculture } from '@/state/aquaculture-store';
-
-const citations = [
-  { title: '국립수산과학원 수산생물질병정보', url: 'https://www.nifs.go.kr/portal/fg/fisgA/actionDiseaseSearch.do' },
-  { title: '국립수산과학원 질병예방 및 진단', url: 'https://nifs.go.kr/portal/pcon0000271/systA/actionConts.do' },
-  { title: '국가법령정보센터: 수산생물질병 관리법 시행규칙', url: 'https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=193193' },
-];
 
 // AI 대응 제안 — 근거 인용 대응·신고 절차
 export default function GuidanceScreen() {
@@ -36,12 +31,12 @@ export default function GuidanceScreen() {
       <ScreenShell contentStyle={styles.top}>
         <GlassCard style={styles.panel}>
           <Text selectable style={styles.panelTitle}>
-            근거 불충분
+            {AppCopy.guidance.insufficientTitle}
           </Text>
           <Text selectable style={styles.body}>
-            의심·주의 등급과 병변 근거가 충분하지 않아 대응 제안을 생성하지 않습니다. 임의 생성 대신 수산질병관리원 등 전문가에게 문의하세요.
+            {AppCopy.guidance.insufficientBody}
           </Text>
-          <ActionButton label="닫기" variant="secondary" onPress={() => router.back()} />
+          <ActionButton label={AppCopy.common.close} variant="secondary" onPress={() => router.back()} />
         </GlassCard>
       </ScreenShell>
     );
@@ -53,10 +48,10 @@ export default function GuidanceScreen() {
         <GlassCard style={styles.loading}>
           <ActivityIndicator color={Palette.primary} />
           <Text selectable style={styles.panelTitle}>
-            대응 제안 생성 중
+            {AppCopy.guidance.loadingTitle}
           </Text>
           <Text selectable style={styles.body}>
-            등급과 병변 근거를 기준으로 현장 대응·신고 안내를 구성하고 있어요.
+            {AppCopy.guidance.loadingBody}
           </Text>
         </GlassCard>
       </ScreenShell>
@@ -68,29 +63,29 @@ export default function GuidanceScreen() {
       <GlassCard emphasis="strong" style={styles.hero}>
         <View style={styles.heroText}>
           <Text selectable style={styles.heroKicker}>
-            {result.tankId} · {tank?.groupId ?? '수조군'}
+            {result.tankId} · {tank?.groupId ?? AppCopy.common.tankGroupFallback}
           </Text>
           <Text selectable style={styles.heroTitle}>
-            {tank?.groupId ?? '수조군'} 차단 후 공식 절차 확인
+            {AppCopy.guidance.heroTitle(tank?.groupId ?? AppCopy.common.tankGroupFallback)}
           </Text>
         </View>
         <StatusBadge status={result.grade} />
       </GlassCard>
 
-      <Section title="현장 대응">
-        <Step index="1" title="동일 수조 재촬영" body="물 밖·근접·단일 개체 조건으로 1회 이상 재촬영해 병변 후보가 반복되는지 확인합니다." />
-        <Step index="2" title="같은 수조군 차단" body={`${tank?.groupId ?? '공유 계통'}의 취수·배수·기구·작업 동선을 분리하고 인접 수조의 촬영 순위를 올립니다.`} />
-        <Step index="3" title="전문가 확인" body="AI 결과, 원본 사진, 수조 정보를 묶어 수산질병관리원 등 전문가에게 확인을 요청합니다." />
+      <Section title={AppCopy.guidance.fieldResponse}>
+        <Step index="1" title={AppCopy.guidance.recaptureTitle} body={AppCopy.guidance.recaptureBody} />
+        <Step index="2" title={AppCopy.guidance.blockGroupTitle} body={AppCopy.guidance.blockGroupBody(tank?.groupId ?? AppCopy.common.sharedGroupFallback)} />
+        <Step index="3" title={AppCopy.guidance.expertTitle} body={AppCopy.guidance.expertBody} />
       </Section>
 
-      <Section title="신고 절차">
+      <Section title={AppCopy.guidance.reporting}>
         <Text selectable style={styles.body}>
-          바이러스성출혈성패혈증(VHS) 등 법정 전염병 또는 대량 폐사 의심 상황은 공식 기관 안내와 현행 법령을 확인해 신고 여부를 결정해야 합니다. 이 화면은 신고 판단을 대체하지 않습니다.
+          {AppCopy.guidance.reportingBody}
         </Text>
       </Section>
 
-      <Section title="인용 출처">
-        {citations.map((c) => (
+      <Section title={AppCopy.guidance.sources}>
+        {AppCopy.guidance.citations.map((c) => (
           <Pressable
             key={c.url}
             accessibilityRole="link"
@@ -109,11 +104,11 @@ export default function GuidanceScreen() {
 
       <View style={styles.notice}>
         <Text selectable style={styles.noticeText}>
-          AI 판정은 확진이 아닙니다. 방역·투약·출하 제한·신고는 양식장 관리자 책임 아래 공식 지침과 전문가 판단을 기준으로 진행하세요.
+          {AppCopy.guidance.disclaimer}
         </Text>
       </View>
 
-      <ActionButton label="닫기" variant="secondary" onPress={() => router.back()} />
+      <ActionButton label={AppCopy.common.close} variant="secondary" onPress={() => router.back()} />
     </ScreenShell>
   );
 }

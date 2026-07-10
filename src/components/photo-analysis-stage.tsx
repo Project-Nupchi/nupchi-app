@@ -1,94 +1,78 @@
 import { Image } from 'expo-image';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { FlounderMark } from '@/components/tank-decor';
-import { Palette, Radius, Shadow, Water } from '@/constants/aqua-theme';
-import { InspectionResult } from '@/domain/aquaculture';
+import { Palette, Radius } from '@/constants/aqua-theme';
+import { InspectionResult, LesionBox } from '@/domain/aquaculture';
+
+const analysisPhoto = require('../../assets/images/results/flounder-analysis.png');
 
 export function PhotoAnalysisStage({ result }: { result: InspectionResult }) {
-  const hasPhoto = Boolean(result.photoUri && !result.photoUri.startsWith('mock://'));
-  const completed = result.status === 'completed';
+  const usesDemoPhoto = !result.photoUri || result.photoUri.startsWith('mock://');
+  const source = usesDemoPhoto ? analysisPhoto : { uri: result.photoUri };
 
   return (
     <View style={styles.frame}>
-      {hasPhoto ? (
-        <Image source={{ uri: result.photoUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-      ) : (
-        <View style={styles.placeholder}>
-          <View style={styles.sandBed} />
-          <FlounderMark width={200} showLesion={completed && result.lesions.length > 0} />
-        </View>
-      )}
+      <Image
+        accessibilityLabel="분석 대상 광어 사진"
+        contentFit={usesDemoPhoto ? "fill" : "cover"}
+        source={source}
+        style={usesDemoPhoto ? styles.demoPhoto : StyleSheet.absoluteFill}
+      />
 
-      {/* 실제 사진일 때만 좌표 기반 병변 박스를 그린다 */}
-      {hasPhoto && completed
-        ? result.lesions.map((box) => (
+      {result.status === 'completed'
+        ? result.lesions.map((box, index) => (
             <View
+              accessibilityLabel={`${box.label} 감지 영역`}
+              accessible
               key={box.id}
-              style={[
-                styles.box,
-                { left: `${box.x}%`, top: `${box.y}%`, width: `${box.width}%`, height: `${box.height}%` },
-              ]}
-            >
-              <Text selectable style={styles.boxLabel}>
-                {box.label}
-              </Text>
-            </View>
+              style={[styles.box, getBoxStyle(box, usesDemoPhoto, index)]}
+            />
           ))
         : null}
     </View>
   );
 }
 
+function getBoxStyle(box: LesionBox, usesDemoPhoto: boolean, index: number) {
+  if (usesDemoPhoto) {
+    // Figma 데모 사진의 확대 크롭 좌표. 여러 병변은 겹치지 않도록 미세하게 이동한다.
+    return {
+      height: '21.7%',
+      left: `${41.6 + index * 13}%`,
+      top: `${43.3 + index * 8}%`,
+      width: '21%',
+    } as const;
+  }
+
+  return {
+    height: `${box.height}%`,
+    left: `${box.x}%`,
+    top: `${box.y}%`,
+    width: `${box.width}%`,
+  } as const;
+}
+
 const styles = StyleSheet.create({
   frame: {
-    aspectRatio: 4 / 3,
-    backgroundColor: '#EAF1F8',
-    borderColor: Palette.glassLine,
-    borderRadius: Radius.card,
-    borderWidth: 1,
+    aspectRatio: 353 / 217,
+    backgroundColor: Palette.primarySoft,
+    borderRadius: Radius.analysisImage,
     overflow: 'hidden',
     position: 'relative',
-    ...Shadow.card,
+    width: '100%',
   },
-  placeholder: {
-    alignItems: 'center',
-    bottom: 0,
-    justifyContent: 'center',
-    left: 0,
+  demoPhoto: {
+    aspectRatio: 1734 / 974,
+    left: '-24%',
     position: 'absolute',
-    right: 0,
-    top: 0,
-  },
-  sandBed: {
-    backgroundColor: Water.sandBed,
-    borderTopLeftRadius: 80,
-    borderTopRightRadius: 50,
-    bottom: 0,
-    height: '22%',
-    left: 0,
-    position: 'absolute',
-    right: 0,
+    top: '-69%',
+    width: '246%',
   },
   box: {
-    backgroundColor: 'rgba(210, 69, 58, 0.12)',
-    borderColor: Water.lesion,
-    borderRadius: 4,
-    borderStyle: 'dashed',
-    borderWidth: 2,
+    backgroundColor: Palette.suspiciousBg,
+    borderColor: Palette.suspicious,
+    borderRadius: Radius.image - 4,
+    borderWidth: 1,
     position: 'absolute',
-  },
-  boxLabel: {
-    backgroundColor: Water.lesion,
-    borderRadius: 5,
-    color: Palette.white,
-    fontSize: 12,
-    fontWeight: '800',
-    left: -2,
-    overflow: 'hidden',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    position: 'absolute',
-    top: -26,
   },
 });

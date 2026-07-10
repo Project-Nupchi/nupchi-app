@@ -1,13 +1,14 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Palette, Radius } from '@/constants/aqua-theme';
+import { InspectionStatusCopy } from '@/constants/copy';
 import { InspectionStatus } from '@/domain/aquaculture';
 
 // 촬영·판정 상태: 대기/완료/실패
 const config: Record<InspectionStatus, { label: string; bg: string; line: string; text: string }> = {
-  pending: { label: '판정 대기', bg: Palette.blueBg, line: Palette.blueLine, text: Palette.blue },
-  completed: { label: '판정 완료', bg: Palette.normalBg, line: Palette.normalLine, text: Palette.normal },
-  failed: { label: '판정 실패', bg: Palette.suspiciousBg, line: Palette.suspiciousLine, text: Palette.suspicious },
+  pending: { label: InspectionStatusCopy.pending, bg: Palette.blueBg, line: Palette.blueLine, text: Palette.blue },
+  completed: { label: InspectionStatusCopy.completed, bg: Palette.normalBg, line: Palette.normalLine, text: Palette.normal },
+  failed: { label: InspectionStatusCopy.failed, bg: Palette.suspiciousBg, line: Palette.suspiciousLine, text: Palette.suspicious },
 };
 
 export function StateChip({ status }: { status: InspectionStatus }) {

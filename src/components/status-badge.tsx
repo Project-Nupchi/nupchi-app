@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Palette, Radius } from '@/constants/aqua-theme';
+import { BinaryStatusCopy } from '@/constants/copy';
 import { TankStatus, statusLabel } from '@/domain/aquaculture';
 
 const colors: Record<TankStatus, { bg: string; line: string; text: string }> = {
@@ -9,14 +10,24 @@ const colors: Record<TankStatus, { bg: string; line: string; text: string }> = {
   suspicious: { bg: Palette.suspiciousBg, line: Palette.suspiciousLine, text: Palette.suspicious },
 };
 
-export function StatusBadge({ status, compact = false }: { status: TankStatus; compact?: boolean }) {
-  const color = colors[status];
+export function StatusBadge({
+  status,
+  compact = false,
+  binary = false,
+}: {
+  status: TankStatus;
+  compact?: boolean;
+  binary?: boolean;
+}) {
+  const displayStatus = binary && status !== 'normal' ? 'suspicious' : status;
+  const color = colors[displayStatus];
+  const label = binary ? BinaryStatusCopy[status === 'normal' ? 'normal' : 'suspicious'] : statusLabel[status];
 
   return (
     <View style={[styles.badge, { backgroundColor: color.bg, borderColor: color.line }, compact && styles.compact]}>
       <View style={[styles.dot, { backgroundColor: color.text }]} />
       <Text selectable style={[styles.text, { color: color.text }, compact && styles.compactText]}>
-        {statusLabel[status]}
+        {label}
       </Text>
     </View>
   );

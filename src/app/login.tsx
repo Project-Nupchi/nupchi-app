@@ -5,18 +5,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ActionButton } from '@/components/action-button';
 import { FlounderMark } from '@/components/tank-decor';
 import { Gradient, Palette, Radius, Space } from '@/constants/aqua-theme';
+import { AppCopy } from '@/constants/copy';
 import { useAquaculture } from '@/state/aquaculture-store';
 
 // 온보딩 · 로그인 — 인증 후 어가 컨텍스트 진입
 export default function LoginScreen() {
-  const { login } = useAquaculture();
-  const [farmName, setFarmName] = useState('제주 성산 광어양식장');
-  const [isLoading, setIsLoading] = useState(false);
+  const { login, isHydrating, error, apiMode } = useAquaculture();
+  const [farmName, setFarmName] = useState<string>(AppCopy.login.defaultFarmName);
 
-  const submit = () => {
+  const submit = async () => {
     if (!farmName.trim()) return;
-    setIsLoading(true);
-    setTimeout(() => login(farmName), 350);
+    await login(farmName);
   };
 
   return (
@@ -26,32 +25,33 @@ export default function LoginScreen() {
         <View style={styles.brand}>
           <FlounderMark width={180} />
           <Text selectable style={styles.title}>
-            제주 바이오 AX
+            {AppCopy.login.brand}
           </Text>
           <Text selectable style={styles.subtitle}>
-            광어 수조의 유병 신호를 촬영 한 장으로 기록하고 추적합니다.
+            {AppCopy.login.subtitle}
           </Text>
         </View>
 
         <View style={styles.form}>
           <Text selectable style={styles.label}>
-            어가 이름
+            {AppCopy.login.farmNameLabel}
           </Text>
           <TextInput
-            editable={!isLoading}
+            editable={!isHydrating}
             onChangeText={setFarmName}
-            placeholder="예: 제주 성산 광어양식장"
+            placeholder={AppCopy.login.farmNamePlaceholder}
             placeholderTextColor={Palette.onGradientFaint}
             style={styles.input}
             value={farmName}
           />
           <ActionButton
-            label={isLoading ? '어가 정보 불러오는 중…' : '로그인'}
-            disabled={isLoading || !farmName.trim()}
+            label={isHydrating ? AppCopy.login.submitting : AppCopy.login.submit}
+            disabled={isHydrating || !farmName.trim()}
             onPress={submit}
           />
+          {error ? <Text selectable style={styles.error}>{error}</Text> : null}
           <Text selectable style={styles.caption}>
-            촬영과 수조 등록은 로그인 후 오프라인에서도 동작합니다. 로그인에는 네트워크 연결이 필요합니다.
+            {apiMode === 'mock' ? AppCopy.login.mockCaption : AppCopy.login.remoteCaption}
           </Text>
         </View>
       </KeyboardAvoidingView>
@@ -110,6 +110,12 @@ const styles = StyleSheet.create({
     color: Palette.onGradientMuted,
     fontSize: 13,
     lineHeight: 19,
+    textAlign: 'center',
+  },
+  error: {
+    color: Palette.onGradient,
+    fontSize: 13,
+    fontWeight: '700',
     textAlign: 'center',
   },
 });
