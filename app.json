@@ -4,11 +4,11 @@
     "slug": "project-nupchi",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/havicon.png",
     "scheme": "projectnupchi",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/havicon.png",
       "infoPlist": {
         "NSCameraUsageDescription": "수조 점검용 어류 사진을 촬영하기 위해 카메라 접근이 필요합니다.",
         "NSPhotoLibraryUsageDescription": "수조 점검용 어류 사진을 선택하기 위해 사진 보관함 접근이 필요합니다."
@@ -17,12 +17,7 @@
       "appleTeamId": "9T3ZYD7RJF"
     },
     "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
+      "icon": "./assets/images/havicon.png",
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.CAMERA"
@@ -33,7 +28,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/havicon.png"
     },
     "plugins": [
       "expo-router",
@@ -41,7 +36,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/havicon.png",
           "imageWidth": 76
         }
       ],
