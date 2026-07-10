@@ -12,6 +12,7 @@ import { AppCopy } from '@/constants/copy';
 import type { InspectionResult, MutationResult, Tank } from '@/models/aquaculture';
 import { MockAquacultureApi } from '@/services/api/mock-aquaculture-api';
 import {
+  applyCropUrls,
   diagnosisToInspection,
   storedAiResultToInspection,
   tankRecordToModel,
@@ -95,7 +96,9 @@ export function AquacultureProvider({ children }: PropsWithChildren) {
     const groups = new Map(overview.groups.map((group) => [group.id, group]));
     setFarmName(overview.farm.name);
     setTanks(overview.tanks.map((tank) => tankRecordToModel(tank, groups)));
-    setResults(history.flatMap(toStoredInspection));
+
+    const drafts = history.flatMap(toStoredInspection);
+    setResults(await withHistoryCropUrls(repository, drafts));
   }, []);
 
   const refresh = useCallback(async (): Promise<MutationResult> => {
@@ -353,6 +356,30 @@ function toStoredInspection(value: Parameters<typeof storedAiResultToInspection>
     return [storedAiResultToInspection(value)];
   } catch {
     return [];
+  }
+}
+
+// History crops live in Storage as cropPath; resolve them to signed URLs so each object
+// shows its own crop. Crop thumbnails are an enhancement, so a signing failure degrades to
+// the original-photo fallback rather than failing the whole history load.
+async function withHistoryCropUrls(
+  repository: ReturnType<typeof getSupabaseRepository>,
+  results: InspectionResult[]
+): Promise<InspectionResult[]> {
+  const cropPaths = [
+    ...new Set(
+      results.flatMap((result) =>
+        (result.objects ?? []).flatMap((object) => (object.cropPath ? [object.cropPath] : []))
+      )
+    ),
+  ];
+  if (cropPaths.length === 0) return results;
+
+  try {
+    const cropUrls = await repository.createSignedPhotoUrls(cropPaths);
+    return results.map((result) => applyCropUrls(result, cropUrls));
+  } catch {
+    return results;
   }
 }
 

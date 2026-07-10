@@ -16,8 +16,8 @@ export interface FishDetection {
 }
 
 export interface DiseasePrediction {
+  /** Contract diagnosis-2026.07.4 dropped disease confidence; classification is label-only. */
   disease: string;
-  confidence: number;
 }
 
 export interface FishDiagnosis {
@@ -30,14 +30,20 @@ export interface FishDiagnosis {
   grade: FishDiagnosisGrade;
   /** Present in the immediate /diagnose response, omitted from Supabase history. */
   cropDataUri?: string;
+  /** Storage path for history crops. Set by /diagnose, null for /detect and pre-feature history. */
+  cropPath: string | null;
 }
 
 export interface DiagnosisResponse {
   aiResultId: string;
   fishCount: number;
   suspectCount: number;
+  /** fishCount - suspectCount, surfaced for "정상 N마리" display. */
+  normalCount: number;
   affectedRatio: number;
   overallGrade: OverallDiagnosisGrade;
+  /** Tank-level suspected disease codes, deduplicated and ordered by prevalence. */
+  diseaseSummary: string[];
   fish: FishDiagnosis[];
   inferenceMs: number;
   modelVersion: string;
