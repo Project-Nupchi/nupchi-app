@@ -78,6 +78,7 @@ export default function ResultScreen() {
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const carouselRef = useRef<FlatList<ObjectAnalysis>>(null);
+  const initializedFilterResultId = useRef<string | null>(null);
   const [carouselWidth, setCarouselWidth] = useState(() => Math.min(560, windowWidth - Space.lg * 2));
   const carouselPageInterval = carouselWidth + CAROUSEL_PAGE_GAP;
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -114,6 +115,15 @@ export default function ResultScreen() {
   };
 
   const objectAnalyses = useMemo(() => buildObjectAnalyses(result), [result]);
+
+  useEffect(() => {
+    if (result?.status !== 'completed' || initializedFilterResultId.current === result.id) return;
+
+    initializedFilterResultId.current = result.id;
+    setActiveIndex(0);
+    setFilter(objectAnalyses.some((analysis) => analysis.status === 'suspicious') ? 'suspicious' : 'all');
+  }, [objectAnalyses, result?.id, result?.status]);
+
   const filteredAnalyses = useMemo(
     () => objectAnalyses.filter((item) => filter === 'all' || item.status === filter),
     [filter, objectAnalyses]
@@ -276,10 +286,12 @@ export default function ResultScreen() {
                           label={AppCopy.result.suspectedDisease}
                           value={analysis.result.diseases.join(', ') || AppCopy.result.noDisease}
                         />
-                        <DetailRow
-                          label={AppCopy.result.observedPart}
-                          value={analysis.result.bodyParts.join(', ') || AppCopy.result.notDetected}
-                        />
+                        {getObservedParts(analysis.result) ? (
+                          <DetailRow
+                            label={AppCopy.result.observedPart}
+                            value={getObservedParts(analysis.result)}
+                          />
+                        ) : null}
                       </GlassCard>
                     </View>
                   )}
@@ -513,7 +525,8 @@ function CompletedSummary({
                 accessibilityIgnoresInvertColors
                 accessible={false}
                 source={resultStatusIcons[status]}
-                style={[styles.gradeIcon, { tintColor: gradeColor }]}
+                tintColor={gradeColor}
+                style={styles.gradeIcon}
                 contentFit="contain"
               />
               <Text selectable style={styles.metaValue}>
@@ -809,7 +822,9 @@ function buildTankResponse(result: InspectionResult | undefined, analyses: Objec
   const suspiciousAnalyses = analyses.filter((analysis) => analysis.status === 'suspicious');
   const suspiciousCount = result?.suspectCount ?? suspiciousAnalyses.length;
   const normalCount = Math.max(totalCount - suspiciousCount, 0);
-  const diseaseLabels = unique(suspiciousAnalyses.flatMap((analysis) => analysis.result.diseases));
+  // Prefer the server's tank-level summary (deduped, prevalence-ordered) over per-object aggregation.
+  const diseaseLabels =
+    result?.diseases ?? unique(suspiciousAnalyses.flatMap((analysis) => analysis.result.diseases));
 
   return {
     totalCount,
@@ -842,6 +857,18 @@ function inferBodyPartsForLesion(bodyParts: string[], lesion: LesionBox) {
 
 function getSymptomSummary(result: InspectionResult) {
   return result.lesions.map((lesion) => lesion.label).join(', ') || result.bodyParts.join(', ') || AppCopy.result.noFinding;
+}
+
+// 관찰 부위는 증상과 구분되는 실제 부위(예: 체표, 지느러미)일 때만 노출한다. 라이브 추론은
+// 부위 데이터를 별도로 주지 않아 bodyParts가 증상 라벨과 겹치는데, 이 경우(또는 데이터가 없을
+// 때)는 빈 문자열을 돌려 행을 숨긴다. 샘플·이력의 실제 부위는 그대로 표시된다.
+function getObservedParts(result: InspectionResult) {
+  const symptomLabels = new Set(result.lesions.map((lesion) => lesion.label));
+  return result.bodyParts.filter((part) => !symptomLabels.has(stripConfidence(part))).join(', ');
+}
+
+function stripConfidence(label: string) {
+  return label.replace(/\s+\d+%$/, '');
 }
 
 const styles = StyleSheet.create({

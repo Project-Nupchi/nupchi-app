@@ -29,7 +29,6 @@ export type Tank = {
 
 export type DiseaseEvidence = {
   code: string;
-  confidence: number;
   label: string;
 };
 
@@ -54,6 +53,10 @@ export type InspectionObject = {
   symptomEvidence?: SymptomEvidence[];
   evidenceSummary: string;
   lesions: LesionBox[];
+  /** Crop-relative lesion boxes, restored onto `lesions` once the crop image is shown (history reload). */
+  cropLesions?: LesionBox[];
+  /** Storage path for this fish crop, for reloading history crops via signed URL. */
+  cropPath?: string | null;
 };
 
 export type InspectionResult = {
