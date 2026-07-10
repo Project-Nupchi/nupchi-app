@@ -2,7 +2,16 @@ import { useMemo } from 'react';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Gradient, Palette, Radius, Shadow, Space, Type, Water } from '@/constants/aqua-theme';
@@ -27,13 +36,14 @@ const statusIcons: Record<TankStatus, number> = {
 const APP_BAR_HEIGHT = Space.lg * 3;
 
 export default function HomeScreen() {
-  const { session, tanks, results } = useAquaculture();
+  const { error, farmName, isHydrating, refresh, tanks, results } = useAquaculture();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
 
-  const sorted = useMemo(() => sortTanksByRisk(tanks, results), [results, tanks]);
+  const activeTanks = useMemo(() => tanks.filter((tank) => tank.active), [tanks]);
+  const sorted = useMemo(() => sortTanksByRisk(activeTanks, results), [activeTanks, results]);
   const counts = { normal: 0, caution: 0, suspicious: 0 };
-  for (const tank of tanks) counts[getTankGroupStatus(tanks, results, tank)] += 1;
+  for (const tank of activeTanks) counts[getTankGroupStatus(activeTanks, results, tank)] += 1;
 
   // 헤드라인: 가장 높은 위험 단계 기준
   const headline =
@@ -44,9 +54,29 @@ export default function HomeScreen() {
         : null;
 
   const worstTankId = sorted[0]?.id;
+  const isInitialLoad = isHydrating && tanks.length === 0;
+  const headlineText = isInitialLoad
+    ? AppCopy.home.loading
+    : error && tanks.length === 0
+      ? AppCopy.home.loadFailed
+      : headline
+        ? AppCopy.home.alertHeadline(headline.grade, headline.count)
+        : AppCopy.home.allNormal;
+  const heroActionLabel = error && tanks.length === 0 ? AppCopy.common.retry : AppCopy.home.inspectNow;
+  const heroActionDisabled = !worstTankId && !(error && tanks.length === 0);
+
+  const handleHeroAction = () => {
+    if (error && tanks.length === 0) {
+      void refresh();
+      return;
+    }
+    if (worstTankId) {
+      router.push({ pathname: '/tank/[tankId]', params: { tankId: worstTankId } });
+    }
+  };
 
   // 반응형: 히어로 넙치는 화면 폭 비례(상한), 콘텐츠는 최대 폭 제한
-  const flounderSize = Math.min(width * 0.68, 300);
+  const flounderSize = Math.min(width * 0.62, 276);
   const rippleSize = flounderSize * (455 / 265);
   const heroFlounderImg = headline?.grade === StatusCopy.suspicious ? flounderWarnImg : flounderImg;
   // 카드 가로 스크롤을 중앙 컨테이너(최대 520)와 좌측 정렬
@@ -61,7 +91,7 @@ export default function HomeScreen() {
       />
 
       <View
-        accessibilityLabel={`현재 양식장 ${session.farmName}`}
+        accessibilityLabel={`현재 양식장 ${farmName}`}
         accessible
         style={[
           styles.appBar,
@@ -73,13 +103,20 @@ export default function HomeScreen() {
             <Image source={mapPinImg} style={styles.mapPin} contentFit="contain" />
           </View>
           <Text numberOfLines={1} selectable style={styles.locationText}>
-            {session.farmName}
+            {farmName}
           </Text>
         </View>
       </View>
 
       <ScrollView
         contentInsetAdjustmentBehavior="never"
+        refreshControl={
+          <RefreshControl
+            onRefresh={() => void refresh()}
+            refreshing={isHydrating}
+            tintColor={Palette.primary}
+          />
+        }
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scroll,
@@ -93,24 +130,19 @@ export default function HomeScreen() {
               <Text selectable style={styles.headlineSub}>
                 {AppCopy.home.todayStatus}
               </Text>
-              {headline ? (
-                <Text selectable style={styles.headline}>
-                  {AppCopy.home.alertHeadline(headline.grade, headline.count)}
-                </Text>
-              ) : (
-                <Text selectable style={styles.headline}>
-                  {AppCopy.home.allNormal}
-                </Text>
-              )}
+              <Text selectable style={styles.headline}>
+                {headlineText}
+              </Text>
+              {isInitialLoad ? <ActivityIndicator color={Palette.primary} /> : null}
             </View>
             <Pressable
               accessibilityRole="button"
-              disabled={!worstTankId}
-              onPress={() => router.push({ pathname: '/tank/[tankId]', params: { tankId: worstTankId } })}
+              disabled={heroActionDisabled}
+              onPress={handleHeroAction}
               style={({ pressed }) => [styles.cta, pressed && styles.pressed]}
             >
               <Text selectable={false} style={styles.ctaText}>
-                {AppCopy.home.inspectNow}
+                {heroActionLabel}
               </Text>
               <Image source={chevronBlueImg} style={styles.ctaIcon} contentFit="contain" />
             </Pressable>
@@ -124,12 +156,17 @@ export default function HomeScreen() {
 
           {/* 수조 현황 */}
           <View style={styles.tanksSection}>
-            <View style={styles.sectionHeader}>
-              <Text selectable style={styles.sectionTitle}>
+            <Pressable
+              accessibilityLabel={AppCopy.navigation.tankStatus}
+              accessibilityRole="button"
+              onPress={() => router.navigate('/tank-status')}
+              style={({ pressed }) => [styles.sectionHeader, pressed && styles.pressed]}
+            >
+              <Text selectable={false} style={styles.sectionTitle}>
                 {AppCopy.navigation.tankStatus}
               </Text>
               <Image source={chevronDarkImg} style={styles.sectionChevron} contentFit="contain" />
-            </View>
+            </Pressable>
           </View>
         </View>
 
@@ -141,7 +178,7 @@ export default function HomeScreen() {
           contentContainerStyle={[styles.cardRow, { paddingHorizontal: cardInset }]}
         >
           {sorted.map((tank) => {
-            const status = getTankGroupStatus(tanks, results, tank);
+            const status = getTankGroupStatus(activeTanks, results, tank);
             return (
               <Pressable
                 key={tank.id}
@@ -150,7 +187,7 @@ export default function HomeScreen() {
                 style={({ pressed }) => [styles.card, pressed && styles.pressed]}
               >
                 <Text selectable style={styles.cardId}>
-                  {tank.id}
+                  {tank.code}
                 </Text>
                 <View style={styles.cardStatusRow}>
                   <Image source={statusIcons[status]} style={styles.cardStatusIcon} contentFit="contain" />
@@ -313,7 +350,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   sectionTitle: {
-    color: Palette.textMuted,
+    color: Palette.text,
     ...Type.heading2,
   },
   sectionChevron: {

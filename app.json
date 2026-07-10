@@ -25,7 +25,9 @@
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "android.permission.CAMERA",
+        "android.permission.CAMERA"
+      ],
+      "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
       ]
     },
@@ -46,7 +48,9 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "수조 점검용 어류 사진을 촬영하기 위해 카메라 접근이 필요합니다."
+          "cameraPermission": "수조 점검용 어류 사진을 촬영하기 위해 카메라 접근이 필요합니다.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
         }
       ],
       [
@@ -56,7 +60,16 @@
           "cameraPermission": false,
           "microphonePermission": false
         }
-      ]
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "buildReactNativeFromSource": true
+          }
+        }
+      ],
+      "./plugins/with-safe-ios-bundle-script"
     ],
     "experiments": {
       "typedRoutes": true,

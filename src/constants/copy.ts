@@ -43,17 +43,8 @@ export const AppCopy = {
     tankStatus: '수조 목록',
     capture: '촬영',
   },
-  login: {
-    defaultFarmName: '제주 성산 광어양식장',
-    brand: '제주 바이오 AX',
-    subtitle: '광어 수조의 유병 신호를 촬영 한 장으로 기록하고 추적합니다.',
-    farmNameLabel: '어가 이름',
-    farmNamePlaceholder: '예: 제주 성산 광어양식장',
-    submit: '로그인',
-    submitting: '어가 정보 불러오는 중…',
-    remoteCaption: '로그인 후 수조와 촬영 데이터가 서버 계정에 동기화됩니다.',
-    mockCaption: '현재 샘플 데이터 모드입니다. API 주소를 설정하면 서버 데이터로 전환됩니다.',
-    defaultFarmFallback: '제주 광어 양식장',
+  farm: {
+    defaultName: '제주 성산 광어양식장',
   },
   validation: {
     tankIdRequired: '수조 ID를 입력하세요.',
@@ -90,6 +81,8 @@ export const AppCopy = {
   },
   home: {
     todayStatus: '오늘의 수조 상태',
+    loading: '수조 정보를\n불러오고 있어요',
+    loadFailed: '수조 정보를\n불러오지 못했어요',
     allNormal: '모든 수조가\n양호한 상태예요',
     inspectNow: '수조 바로 확인하기',
     alertHeadline: (grade: string, count: number) => `${grade} 단계의 수조가\n${count}개 발견됐어요`,
@@ -222,7 +215,7 @@ export const AppCopy = {
       '국립수산과학원 ‘양식 넙치 메뉴얼’ 20p',
       '국립수산과학원 ‘양식 넙치 메뉴얼’ 124p',
     ],
-    modalDisclaimer: 'AI 판정은 확진이 아니에요.\n방역·투약·출하제한·신고는 양식장 관리자 책임 하에\n공식 지침과 전문가 판단으로 진행하세요.',
+    modalDisclaimer: 'AI 판정은 확진이 아니에요. 방역·투약·출하 제한·신고는 양식장 관리자 책임 아래 공식 지침과 전문가 판단으로 진행하세요.',
     reporting: '신고 절차',
     reportingBody: '바이러스성출혈성패혈증(VHS) 등 법정 전염병 또는 대량 폐사 의심 상황은 공식 기관 안내와 현행 법령을 확인해 신고 여부를 결정해야 합니다. 이 화면은 신고 판단을 대체하지 않습니다.',
     sources: '인용 출처',

@@ -250,8 +250,14 @@ export const AnalysisLoading = {
   contentTopRatio: 0.275,
   fishSize: 152,
   magnifierSize: 62,
-  orbitSize: 140,
+  orbitSize: 124,
   stageSize: 202,
   spinnerSize: 28,
-  loopDuration: 2000,
+  orbitDuration: 2600,
+  spinnerDuration: 2000,
+} as const;
+
+// 개체 분석 결과 이미지가 세로로 과도하게 늘어나지 않도록 제한한다.
+export const AnalysisResult = {
+  imageMaxHeight: 320,
 } as const;

@@ -51,8 +51,8 @@ export default function TankFormScreen() {
   const editing = tanks.find((tank) => tank.id === editId);
   const missingEditingTank = isEditMode && !editing;
 
-  const [tankId, setTankId] = useState(editing?.id ?? '');
-  const [groupId, setGroupId] = useState(editing?.groupId ?? '');
+  const [tankId, setTankId] = useState(editing?.code ?? '');
+  const [groupId, setGroupId] = useState(editing?.groupName ?? '');
   const [stockedInfo, setStockedInfo] = useState(editing?.stockedInfo ?? '');
   const [active, setActive] = useState(editing?.active ?? true);
   const [error, setError] = useState('');

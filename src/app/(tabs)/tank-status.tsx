@@ -1,7 +1,18 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View, ViewStyle, useWindowDimensions } from 'react-native';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
+  useWindowDimensions,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FigmaTokens, Gradient, Palette, Radius, Shadow, Space, Type } from '@/constants/aqua-theme';
@@ -32,10 +43,11 @@ const webBlur =
     : null;
 
 export default function TankStatusScreen() {
-  const { tanks, results } = useAquaculture();
+  const { error, isHydrating, refresh, tanks, results } = useAquaculture();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const sortedTanks = sortTanksByRisk(tanks.filter((tank) => tank.active), results);
+  const activeTanks = tanks.filter((tank) => tank.active);
+  const sortedTanks = sortTanksByRisk(activeTanks, results);
   const contentWidth = Math.min(width - Space.lg * 2, 520);
 
   return (
@@ -65,6 +77,13 @@ export default function TankStatusScreen() {
 
       <ScrollView
         contentInsetAdjustmentBehavior="never"
+        refreshControl={
+          <RefreshControl
+            onRefresh={() => void refresh()}
+            refreshing={isHydrating}
+            tintColor={Palette.primary}
+          />
+        }
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollContent,
@@ -75,10 +94,32 @@ export default function TankStatusScreen() {
         ]}
       >
         <View style={[styles.list, { width: contentWidth }]}>
-          {sortedTanks.map((tank) => {
-            const status = getTankGroupStatus(tanks, results, tank);
-            return <TankListCard key={tank.id} status={status} tank={tank} />;
-          })}
+          {isHydrating && sortedTanks.length === 0 ? (
+            <View style={styles.stateCard}>
+              <ActivityIndicator color={Palette.primary} />
+              <Text selectable style={styles.stateText}>{AppCopy.home.loading.replace('\n', ' ')}</Text>
+            </View>
+          ) : error && sortedTanks.length === 0 ? (
+            <View style={styles.stateCard}>
+              <Text selectable style={styles.stateText}>{error}</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => void refresh()}
+                style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
+              >
+                <Text selectable={false} style={styles.retryText}>{AppCopy.common.retry}</Text>
+              </Pressable>
+            </View>
+          ) : sortedTanks.length === 0 ? (
+            <View style={styles.stateCard}>
+              <Text selectable style={styles.stateText}>{AppCopy.camera.noTanksBody}</Text>
+            </View>
+          ) : (
+            sortedTanks.map((tank) => {
+              const status = getTankGroupStatus(activeTanks, results, tank);
+              return <TankListCard key={tank.id} status={status} tank={tank} />;
+            })
+          )}
         </View>
       </ScrollView>
     </View>
@@ -100,12 +141,12 @@ function TankListCard({ tank, status }: { tank: Tank; status: TankStatus }) {
       <View style={styles.cardText}>
         <View style={styles.cardTitleRow}>
           <Text selectable style={styles.tankId}>
-            {tank.id}
+            {tank.code}
           </Text>
           <TankStatusBadge status={status} />
         </View>
         <Text selectable numberOfLines={1} style={styles.meta}>
-          {tank.groupId} · {tank.stockedInfo}
+          {tank.groupName} · {tank.stockedInfo}
         </Text>
         <Text selectable numberOfLines={1} style={styles.captured}>
           {AppCopy.tank.lastCapture(lastCaptured)}
@@ -117,13 +158,16 @@ function TankListCard({ tank, status }: { tank: Tank; status: TankStatus }) {
 }
 
 function formatCapturedAt(value: string) {
-  const date = new Date(value);
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
-  const hours = String(date.getUTCHours()).padStart(2, '0');
-  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-
-  return `${month}.${day}. ${hours}:${minutes}`;
+  const parts = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(value));
+  const values = new Map(parts.map((part) => [part.type, part.value]));
+  return `${values.get('month')}.${values.get('day')}. ${values.get('hour')}:${values.get('minute')}`;
 }
 
 function TankStatusBadge({ status }: { status: TankStatus }) {
@@ -188,6 +232,31 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: Space.sm + Space.xs,
+  },
+  stateCard: {
+    alignItems: 'center',
+    backgroundColor: Palette.glass,
+    borderColor: Palette.glassLine,
+    borderRadius: Radius.card,
+    borderWidth: 1,
+    gap: Space.md,
+    padding: Space.xl,
+    ...Shadow.card,
+  },
+  stateText: {
+    color: Palette.textMuted,
+    textAlign: 'center',
+    ...Type.body2,
+  },
+  retryButton: {
+    backgroundColor: Palette.primary,
+    borderRadius: Radius.pill,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.sm,
+  },
+  retryText: {
+    color: Palette.onPrimary,
+    ...Type.label2,
   },
   card: {
     alignItems: 'center',
