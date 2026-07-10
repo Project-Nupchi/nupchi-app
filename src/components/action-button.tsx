@@ -49,7 +49,7 @@ export function ActionButton({
       ]}
     >
       {shouldRenderSfIcon ? (
-        <Image source={`sf:${icon}`} style={[styles.icon, { tintColor: textColor }]} contentFit="contain" />
+        <Image source={`sf:${icon}`} tintColor={textColor} style={styles.icon} contentFit="contain" />
       ) : null}
       <Text selectable={false} style={[styles.text, size === 'compact' && styles.compactText, { color: textColor }]}>
         {label}

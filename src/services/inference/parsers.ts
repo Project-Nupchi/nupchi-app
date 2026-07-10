@@ -63,8 +63,10 @@ export function parseDiagnosisResponse(
     aiResultId: nonEmptyString(data.aiResultId, 'diagnosis.aiResultId'),
     fishCount,
     suspectCount,
+    normalCount: resolveNormalCount(data.normalCount, fishCount, suspectCount),
     affectedRatio,
     overallGrade,
+    diseaseSummary: resolveDiseaseSummary(data.diseaseSummary, fish),
     fish,
     inferenceMs: nonNegativeNumber(data.inferenceMs, 'diagnosis.inferenceMs'),
     modelVersion: nonEmptyString(data.modelVersion, 'diagnosis.modelVersion'),
@@ -109,6 +111,7 @@ function parseFishDiagnosis(
     ),
     grade: enumValue(data.grade, fishDiagnosisGrades, `${path}.grade`),
     cropDataUri,
+    cropPath: cropPath(data.cropPath, `${path}.cropPath`),
   };
 }
 
@@ -134,10 +137,48 @@ function parseDetection(
 
 function parseDiseasePrediction(value: unknown, path: string): DiseasePrediction {
   const data = record(value, path);
+  // Contract 2026.07.4 drops disease confidence; ignore any legacy confidence still stored.
   return {
     disease: nonEmptyString(data.disease, `${path}.disease`),
-    confidence: rangedNumber(data.confidence, 0, 1, `${path}.confidence`),
   };
+}
+
+/** Server sends normalCount; history omits it, so derive from fishCount - suspectCount. */
+function resolveNormalCount(value: unknown, fishCount: number, suspectCount: number): number {
+  const expected = fishCount - suspectCount;
+  if (value === undefined || value === null) return expected;
+  const parsed = nonNegativeInteger(value, 'diagnosis.normalCount');
+  if (parsed !== expected) invalid('diagnosis.normalCount');
+  return parsed;
+}
+
+/** Server sends deduped, prevalence-ordered summary; history omits it, so derive from fish diseases. */
+function resolveDiseaseSummary(value: unknown, fish: FishDiagnosis[]): string[] {
+  if (value === undefined || value === null) return deriveDiseaseSummary(fish);
+  const values = array(value, 'diagnosis.diseaseSummary');
+  const summary = values.map((item, index) =>
+    nonEmptyString(item, `diagnosis.diseaseSummary[${index}]`)
+  );
+  if (new Set(summary).size !== summary.length) invalid('diagnosis.diseaseSummary');
+  return summary;
+}
+
+function deriveDiseaseSummary(fish: FishDiagnosis[]): string[] {
+  // Map keeps first-seen order; a stable sort by count keeps it for ties → prevalence order.
+  const counts = new Map<string, number>();
+  for (const item of fish) {
+    for (const prediction of item.diseases) {
+      counts.set(prediction.disease, (counts.get(prediction.disease) ?? 0) + 1);
+    }
+  }
+  return [...counts.keys()].sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0));
+}
+
+// Schema marks cropPath optional/nullable (not in fish.required): /diagnose sets it, /detect
+// and mock/history omit it. Immediate display uses cropDataUri, so never fail on a missing path.
+function cropPath(value: unknown, path: string): string | null {
+  if (value === undefined || value === null) return null;
+  return nonEmptyString(value, path);
 }
 
 function parseGuideAction(value: unknown, arrayIndex: number): GuideAction {

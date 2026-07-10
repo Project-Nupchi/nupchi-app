@@ -77,7 +77,8 @@ export function MainTabBar({ descriptors, navigation, state }: MaterialTopTabBar
               <Image
                 contentFit="contain"
                 source={tab.icon}
-                style={[styles.tabIcon, focused ? styles.tabIconActive : styles.tabIconInactive]}
+                tintColor={focused ? Palette.ink : Palette.textSubtle}
+                style={styles.tabIcon}
               />
               <Text selectable={false} style={focused ? styles.tabLabelActive : styles.tabLabel}>
                 {tab.label}
@@ -98,7 +99,7 @@ export function MainTabBar({ descriptors, navigation, state }: MaterialTopTabBar
           pressed && styles.fabPressed,
         ]}
       >
-        <Image contentFit="contain" source={cameraImg} style={styles.fabIcon} />
+        <Image contentFit="contain" source={cameraImg} tintColor={Palette.white} style={styles.fabIcon} />
       </Pressable>
     </View>
   );
@@ -138,12 +139,6 @@ const styles = StyleSheet.create({
     height: 24,
     width: 24,
   },
-  tabIconActive: {
-    tintColor: Palette.ink,
-  },
-  tabIconInactive: {
-    tintColor: Palette.textSubtle,
-  },
   tabLabelActive: {
     color: Palette.ink,
     ...Type.label3,
@@ -167,7 +162,6 @@ const styles = StyleSheet.create({
   },
   fabIcon: {
     height: 28,
-    tintColor: Palette.white,
     width: 28,
   },
   fabPressed: {
