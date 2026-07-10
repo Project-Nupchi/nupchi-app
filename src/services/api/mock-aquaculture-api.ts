@@ -7,38 +7,35 @@ import type {
   CreateInspectionInput,
   CreateTankInput,
   InspectionResult,
-  LoginInput,
   Tank,
   UpdateTankInput,
 } from '@/models/aquaculture';
 
+type LegacySampleTank = {
+  id: string;
+  groupId: string;
+  stockedInfo: string;
+  createdAt: string;
+  active: boolean;
+};
+
 type SampleData = {
-  initialTanks: Tank[];
+  initialTanks: LegacySampleTank[];
   initialResults: InspectionResult[];
 };
 
-const sample = sampleAquaculture as SampleData;
+const MOCK_FARM_ID = '00000000-0000-4000-8000-000000000001';
+const sample = sampleAquaculture as unknown as SampleData;
+let createdTankSequence = 0;
 
 export class MockAquacultureApi implements AquacultureApi {
-  private tanks = clone(sample.initialTanks);
-  private results = clone(sample.initialResults);
-  private ackedAlertIds: string[] = [];
-  private reminderEnabled = true;
+  private tanks: Tank[];
+  private results: InspectionResult[];
 
-  async login(input: LoginInput) {
-    await delay();
-    return {
-      session: {
-        isLoggedIn: true,
-        farmName: input.farmName.trim() || AppCopy.login.defaultFarmFallback,
-        userId: 'mock-user',
-      },
-      accessToken: 'mock-access-token',
-    };
-  }
-
-  async logout() {
-    await delay(80);
+  constructor() {
+    const normalized = normalizeSample(sample);
+    this.tanks = normalized.tanks;
+    this.results = normalized.results;
   }
 
   async getSnapshot(): Promise<AquacultureSnapshot> {
@@ -46,16 +43,22 @@ export class MockAquacultureApi implements AquacultureApi {
     return clone({
       tanks: this.tanks,
       results: this.results,
-      preferences: {
-        ackedAlertIds: this.ackedAlertIds,
-        reminderEnabled: this.reminderEnabled,
-      },
     });
   }
 
   async createTank(input: CreateTankInput) {
     await delay();
-    const tank: Tank = { ...input, createdAt: new Date().toISOString(), active: true };
+    const groupName = normalizeGroupName(input.groupName);
+    const tank: Tank = {
+      id: stableMockUuid('tank', `${Date.now()}-${++createdTankSequence}-${input.code}`),
+      farmId: MOCK_FARM_ID,
+      code: input.code,
+      groupId: stableMockUuid('group', groupName),
+      groupName,
+      stockedInfo: input.stockedInfo,
+      createdAt: new Date().toISOString(),
+      active: true,
+    };
     this.tanks = [tank, ...this.tanks];
     return clone(tank);
   }
@@ -64,16 +67,23 @@ export class MockAquacultureApi implements AquacultureApi {
     await delay();
     const current = this.tanks.find((tank) => tank.id === tankId);
     if (!current) throw new Error(AppCopy.validation.tankNotFound);
-    const updated = { ...current, ...input };
+    const groupName = normalizeGroupName(input.groupName);
+    const updated: Tank = {
+      ...current,
+      ...input,
+      groupId: stableMockUuid('group', groupName),
+      groupName,
+    };
     this.tanks = this.tanks.map((tank) => (tank.id === tankId ? updated : tank));
     return clone(updated);
   }
 
   async createInspection(input: CreateInspectionInput) {
     await delay();
+    const tankId = this.resolveTankId(input.tankId);
     const result: InspectionResult = {
-      id: `R-${Date.now()}`,
-      tankId: input.tankId,
+      id: stableMockUuid('result', `${Date.now()}-${tankId}`),
+      tankId,
       capturedAt: new Date().toISOString(),
       status: 'pending',
       grade: 'normal',
@@ -97,17 +107,61 @@ export class MockAquacultureApi implements AquacultureApi {
     return clone(verdict);
   }
 
-  async acknowledgeAlert(resultId: string, acknowledged: boolean) {
-    await delay(80);
-    this.ackedAlertIds = acknowledged
-      ? [...new Set([...this.ackedAlertIds, resultId])]
-      : this.ackedAlertIds.filter((id) => id !== resultId);
+  private resolveTankId(value: string) {
+    const tank = this.tanks.find((item) => item.id === value || item.code === value);
+    if (!tank) throw new Error(AppCopy.validation.tankNotFound);
+    return tank.id;
   }
+}
 
-  async setReminderEnabled(enabled: boolean) {
-    await delay(80);
-    this.reminderEnabled = enabled;
+function normalizeSample(value: SampleData): { tanks: Tank[]; results: InspectionResult[] } {
+  const tankIdByLegacyId = new Map<string, string>();
+  const tanks = value.initialTanks.map((legacyTank) => {
+    const id = stableMockUuid('tank', legacyTank.id);
+    const groupName = normalizeGroupName(legacyTank.groupId);
+    tankIdByLegacyId.set(legacyTank.id, id);
+    return {
+      id,
+      farmId: MOCK_FARM_ID,
+      code: legacyTank.id,
+      groupId: stableMockUuid('group', groupName),
+      groupName,
+      stockedInfo: legacyTank.stockedInfo,
+      createdAt: legacyTank.createdAt,
+      active: legacyTank.active,
+    };
+  });
+  const results = value.initialResults.map((result) => ({
+    ...clone(result),
+    grade: result.grade === 'normal' ? 'normal' as const : 'caution' as const,
+    tankId: tankIdByLegacyId.get(result.tankId) ?? stableMockUuid('tank', result.tankId),
+  }));
+  return { tanks, results };
+}
+
+function normalizeGroupName(value: string) {
+  return value.trim() || AppCopy.common.unknownGroup;
+}
+
+function stableMockUuid(scope: string, value: string) {
+  const source = `${scope}:${value}`;
+  const hex = [0x811c9dc5, 0x9e3779b9, 0x85ebca6b, 0xc2b2ae35]
+    .map((seed) => hash32(source, seed).toString(16).padStart(8, '0'))
+    .join('')
+    .split('');
+  hex[12] = '4';
+  hex[16] = '8';
+  const compact = hex.join('');
+  return `${compact.slice(0, 8)}-${compact.slice(8, 12)}-${compact.slice(12, 16)}-${compact.slice(16, 20)}-${compact.slice(20)}`;
+}
+
+function hash32(value: string, seed: number) {
+  let hash = seed >>> 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
   }
+  return hash;
 }
 
 function delay(ms = 180) {

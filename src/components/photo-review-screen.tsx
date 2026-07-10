@@ -46,11 +46,23 @@ export function PhotoReviewScreen({
 }: PhotoReviewScreenProps) {
   const [isTankListOpen, setIsTankListOpen] = useState(false);
   const selectableTanks = useMemo(
-    () => [...tanks].sort((a, b) => a.id.localeCompare(b.id, 'ko-KR', { numeric: true })),
+    () =>
+      tanks
+        .filter((tank) => tank.active)
+        .sort((a, b) => a.code.localeCompare(b.code, 'ko-KR', { numeric: true })),
     [tanks]
   );
   const selectedTank = selectableTanks.find((tank) => tank.id === selectedTankId);
   const canContinue = Boolean(selectedTank && !isSubmitting);
+  const selectorDisabled = isSubmitting || selectableTanks.length === 0;
+  const selectorAction = isTankListOpen
+    ? AppCopy.camera.review.closeTankList
+    : AppCopy.camera.review.openTankList;
+  const selectorValue = selectedTank
+    ? `${selectedTank.code}, ${selectedTank.groupName}`
+    : selectableTanks.length > 0
+      ? AppCopy.camera.review.selectTankPlaceholder
+      : AppCopy.camera.review.noTanks;
 
   const closeTankList = () => setIsTankListOpen(false);
 
@@ -93,17 +105,19 @@ export function PhotoReviewScreen({
               </Text>
 
               <Pressable
-                accessibilityLabel={
-                  isTankListOpen ? AppCopy.camera.review.closeTankList : AppCopy.camera.review.openTankList
-                }
+                accessibilityLabel={`${selectorValue}. ${selectorAction}`}
                 accessibilityRole="button"
                 accessibilityState={{
-                  disabled: selectableTanks.length === 0,
+                  disabled: selectorDisabled,
                   expanded: isTankListOpen,
                 }}
-                disabled={selectableTanks.length === 0}
+                disabled={selectorDisabled}
                 onPress={() => setIsTankListOpen((open) => !open)}
-                style={({ pressed }) => [styles.selectorTrigger, pressed && styles.pressed]}
+                style={({ pressed }) => [
+                  styles.selectorTrigger,
+                  selectorDisabled && styles.actionDisabled,
+                  pressed && styles.pressed,
+                ]}
               >
                 {selectedTank ? (
                   <TankIdentity tank={selectedTank} />
@@ -117,7 +131,7 @@ export function PhotoReviewScreen({
                 <Image accessible={false} contentFit="contain" source={chevronDarkImg} style={styles.chevronDown} />
               </Pressable>
 
-              {isTankListOpen ? (
+              {isTankListOpen && !isSubmitting ? (
                 <View style={styles.dropdownShadow}>
                   <View style={styles.dropdownSurface}>
                     <ScrollView
@@ -131,7 +145,8 @@ export function PhotoReviewScreen({
                         return (
                           <Pressable
                             accessibilityRole="button"
-                            accessibilityState={{ selected }}
+                            accessibilityState={{ disabled: isSubmitting, selected }}
+                            disabled={isSubmitting}
                             key={tank.id}
                             onPress={() => {
                               onSelectTank(tank.id);
@@ -175,7 +190,12 @@ export function PhotoReviewScreen({
       </ScrollView>
 
       {message ? (
-        <View pointerEvents="none" style={[styles.messageBanner, { top: topInset + APP_BAR_HEIGHT }]}>
+        <View
+          accessibilityLiveRegion="assertive"
+          accessibilityRole="alert"
+          pointerEvents="none"
+          style={[styles.messageBanner, { top: topInset + APP_BAR_HEIGHT }]}
+        >
           <Text selectable style={styles.messageText}>
             {message}
           </Text>
@@ -233,10 +253,10 @@ function TankIdentity({ tank }: { tank: Tank }) {
   return (
     <View style={styles.tankIdentity}>
       <Text numberOfLines={1} style={styles.tankId}>
-        {tank.id}
+        {tank.code}
       </Text>
       <Text numberOfLines={1} style={styles.tankGroup}>
-        {tank.groupId}
+        {tank.groupName}
       </Text>
     </View>
   );

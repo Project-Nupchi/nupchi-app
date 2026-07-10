@@ -56,7 +56,7 @@ export function AnalysisLoadingScreen() {
 
     const orbitAnimation = Animated.loop(
       Animated.timing(orbitProgress, {
-        duration: AnalysisLoading.loopDuration,
+        duration: AnalysisLoading.orbitDuration,
         easing: Easing.linear,
         toValue: 1,
         useNativeDriver: true,
@@ -64,7 +64,7 @@ export function AnalysisLoadingScreen() {
     );
     const spinnerAnimation = Animated.loop(
       Animated.timing(spinnerProgress, {
-        duration: AnalysisLoading.loopDuration,
+        duration: AnalysisLoading.spinnerDuration,
         easing: Easing.linear,
         toValue: 1,
         useNativeDriver: true,

@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
-  Animated,
+  AccessibilityInfo,
   Dimensions,
+  FlatList,
   Modal,
-  PanResponder,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
   StyleSheet,
@@ -67,14 +69,18 @@ const INFO_POPOVER_WIDTH = 217;
 const APP_BAR_HEIGHT = Space.lg * 3;
 const INFO_BUTTON_SIZE = Space.lg;
 const INFO_BUTTON_HIT_SLOP = (Space.xxl + Space.sm - INFO_BUTTON_SIZE) / 2;
+const CAROUSEL_PAGE_GAP = Space.md;
 
 // 분석 결과 — 촬영 후 서버 판정을 대기/완료/실패로 표시
 export default function ResultScreen() {
   const { resultId } = useLocalSearchParams<{ resultId: string }>();
   const { results, tanks, apiMode, analyzeInspection, applyInspectionVerdict, retryInspection } = useAquaculture();
   const insets = useSafeAreaInsets();
-  const [carouselOpacity] = useState(() => new Animated.Value(1));
-  const [isCarouselTransitioning, setIsCarouselTransitioning] = useState(false);
+  const { width: windowWidth } = useWindowDimensions();
+  const carouselRef = useRef<FlatList<ObjectAnalysis>>(null);
+  const [carouselWidth, setCarouselWidth] = useState(() => Math.min(560, windowWidth - Space.lg * 2));
+  const carouselPageInterval = carouselWidth + CAROUSEL_PAGE_GAP;
+  const [reduceMotion, setReduceMotion] = useState(false);
   const [filter, setFilter] = useState<ObjectFilter>('all');
   const [activeIndex, setActiveIndex] = useState(0);
   const [isGuidanceOpen, setIsGuidanceOpen] = useState(false);
@@ -84,8 +90,23 @@ export default function ResultScreen() {
 
   useEffect(() => {
     if (result?.status !== 'pending') return;
-    analyzeInspection(result.id);
-  }, [analyzeInspection, result]);
+    void analyzeInspection(result.id);
+  }, [analyzeInspection, result?.id, result?.status]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (mounted) setReduceMotion(enabled);
+    });
+
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, []);
 
   const applyPrototypeFallback = () => {
     if (!result) return;
@@ -97,67 +118,66 @@ export default function ResultScreen() {
     () => objectAnalyses.filter((item) => filter === 'all' || item.status === filter),
     [filter, objectAnalyses]
   );
-  const tankResponse = useMemo(() => buildTankResponse(objectAnalyses), [objectAnalyses]);
+  const tankResponse = useMemo(
+    () => buildTankResponse(result, objectAnalyses),
+    [objectAnalyses, result]
+  );
+  const visibleIndex = Math.min(activeIndex, Math.max(filteredAnalyses.length - 1, 0));
+
+  useEffect(() => {
+    if (activeIndex === visibleIndex) return;
+
+    const frame = requestAnimationFrame(() => {
+      setActiveIndex(visibleIndex);
+      carouselRef.current?.scrollToOffset({ animated: false, offset: visibleIndex * carouselPageInterval });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [activeIndex, carouselPageInterval, visibleIndex]);
 
   const selectFilter = (nextFilter: ObjectFilter) => {
-    carouselOpacity.stopAnimation();
-    carouselOpacity.setValue(1);
-    setIsCarouselTransitioning(false);
     setActiveIndex(0);
     setFilter(nextFilter);
   };
 
-  const showAnalysis = useCallback((index: number) => {
-    if (filteredAnalyses.length === 0 || isCarouselTransitioning) return;
+  const showAnalysis = (index: number) => {
+    if (filteredAnalyses.length === 0) return;
     const nextIndex = Math.max(0, Math.min(index, filteredAnalyses.length - 1));
-    if (nextIndex === activeIndex) return;
+    if (nextIndex === visibleIndex) return;
 
-    setIsCarouselTransitioning(true);
-    Animated.timing(carouselOpacity, {
-      duration: 90,
-      toValue: 0,
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (!finished) {
-        carouselOpacity.setValue(1);
-        setIsCarouselTransitioning(false);
-        return;
-      }
+    carouselRef.current?.scrollToOffset({
+      animated: !reduceMotion,
+      offset: nextIndex * carouselPageInterval,
+    });
+    if (reduceMotion) setActiveIndex(nextIndex);
+  };
 
-      setActiveIndex(nextIndex);
-      requestAnimationFrame(() => {
-        Animated.timing(carouselOpacity, {
-          duration: 140,
-          toValue: 1,
-          useNativeDriver: true,
-        }).start(() => {
-          setIsCarouselTransitioning(false);
-        });
+  const syncCarouselIndex = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (carouselPageInterval <= 0 || filteredAnalyses.length === 0) return;
+    const nextIndex = Math.max(
+      0,
+      Math.min(
+        Math.round(event.nativeEvent.contentOffset.x / carouselPageInterval),
+        filteredAnalyses.length - 1
+      )
+    );
+    setActiveIndex((currentIndex) => (currentIndex === nextIndex ? currentIndex : nextIndex));
+  };
+
+  const updateCarouselWidth = (width: number) => {
+    const nextWidth = Math.round(width);
+    if (nextWidth <= 0 || nextWidth === carouselWidth) return;
+
+    setCarouselWidth(nextWidth);
+    requestAnimationFrame(() => {
+      carouselRef.current?.scrollToOffset({
+        animated: false,
+        offset: visibleIndex * (nextWidth + CAROUSEL_PAGE_GAP),
       });
     });
-  }, [activeIndex, carouselOpacity, filteredAnalyses.length, isCarouselTransitioning]);
+  };
 
-  const carouselPanResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gesture) =>
-          filteredAnalyses.length > 1 &&
-          Math.abs(gesture.dx) > 12 &&
-          Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2,
-        onMoveShouldSetPanResponderCapture: (_, gesture) =>
-          filteredAnalyses.length > 1 &&
-          Math.abs(gesture.dx) > 12 &&
-          Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2,
-        onPanResponderRelease: (_, gesture) => {
-          if (Math.abs(gesture.dx) < 48 && Math.abs(gesture.vx) < 0.45) return;
-          showAnalysis(activeIndex + (gesture.dx < 0 ? 1 : -1));
-        },
-        onPanResponderTerminationRequest: () => false,
-      }),
-    [activeIndex, filteredAnalyses.length, showAnalysis]
-  );
-
-  const activeAnalysis = filteredAnalyses[activeIndex] ?? filteredAnalyses[0];
+  const activeAnalysis = filteredAnalyses[visibleIndex] ?? filteredAnalyses[0];
 
   if (!result) {
     return (
@@ -182,12 +202,13 @@ export default function ResultScreen() {
       {result.status === 'completed' ? (
         <>
           <CompletedSummary
+            canOpenGuidance={Boolean(isActionableGrade(result.rawGrade) && result.aiResultId)}
             capturedAt={result.capturedAt}
-            groupId={tank?.groupId ?? AppCopy.common.tankGroupFallback}
+            groupId={tank?.groupName ?? AppCopy.common.tankGroupFallback}
             onOpenGuidance={() => setIsGuidanceOpen(true)}
             response={tankResponse}
             status={result.grade}
-            tankId={tank?.id ?? result.tankId}
+            tankId={tank?.code ?? result.tankId}
           />
 
           <View style={styles.completedAnalysis}>
@@ -200,45 +221,76 @@ export default function ResultScreen() {
               <View style={styles.pager}>
                 <PagerButton
                   accessibilityLabel="이전 개체"
-                  disabled={isCarouselTransitioning || activeIndex <= 0 || filteredAnalyses.length === 0}
+                  disabled={visibleIndex <= 0 || filteredAnalyses.length === 0}
                   direction="previous"
-                  onPress={() => showAnalysis(activeIndex - 1)}
+                  onPress={() => showAnalysis(visibleIndex - 1)}
                 />
                 <Text selectable style={styles.pagerText}>
-                  {filteredAnalyses.length === 0 ? 0 : activeIndex + 1}/{filteredAnalyses.length}
+                  {filteredAnalyses.length === 0 ? 0 : visibleIndex + 1}/{filteredAnalyses.length}
                 </Text>
                 <PagerButton
                   accessibilityLabel="다음 개체"
-                  disabled={
-                    isCarouselTransitioning ||
-                    activeIndex >= filteredAnalyses.length - 1 ||
-                    filteredAnalyses.length === 0
-                  }
+                  disabled={visibleIndex >= filteredAnalyses.length - 1 || filteredAnalyses.length === 0}
                   direction="next"
-                  onPress={() => showAnalysis(activeIndex + 1)}
+                  onPress={() => showAnalysis(visibleIndex + 1)}
                 />
               </View>
             </View>
 
-            <View style={styles.carouselShell} {...carouselPanResponder.panHandlers}>
-              {activeAnalysis ? (
-                <Animated.View
-                  key={activeAnalysis.id}
-                  style={[styles.carouselItem, { opacity: carouselOpacity }]}
-                >
-                  <PhotoAnalysisStage result={activeAnalysis.result} />
-                  <GlassCard style={styles.detailCard}>
-                    <DetailRow label={AppCopy.result.symptom} value={getSymptomSummary(activeAnalysis.result)} />
-                    <DetailRow
-                      label={AppCopy.result.suspectedDisease}
-                      value={activeAnalysis.result.diseases.join(', ') || AppCopy.result.noDisease}
-                    />
-                    <DetailRow
-                      label={AppCopy.result.observedPart}
-                      value={activeAnalysis.result.bodyParts.join(', ') || AppCopy.result.notDetected}
-                    />
-                  </GlassCard>
-                </Animated.View>
+            <View
+              onLayout={(event) => updateCarouselWidth(event.nativeEvent.layout.width)}
+              style={styles.carouselShell}
+            >
+              {filteredAnalyses.length > 0 ? (
+                <FlatList
+                  key={filter}
+                  ref={carouselRef}
+                  accessibilityLabel="개체별 분석 결과"
+                  bounces={false}
+                  data={filteredAnalyses}
+                  decelerationRate="fast"
+                  directionalLockEnabled
+                  disableIntervalMomentum
+                  getItemLayout={(_, index) => ({
+                    index,
+                    length: carouselPageInterval,
+                    offset: carouselPageInterval * index,
+                  })}
+                  horizontal
+                  initialNumToRender={2}
+                  ItemSeparatorComponent={CarouselGap}
+                  keyExtractor={(analysis) => analysis.id}
+                  onMomentumScrollEnd={syncCarouselIndex}
+                  onScroll={syncCarouselIndex}
+                  overScrollMode="never"
+                  removeClippedSubviews={false}
+                  renderItem={({ item: analysis, index }) => (
+                    <View
+                      accessibilityLabel={`${index + 1}/${filteredAnalyses.length} 개체 분석`}
+                      style={[styles.carouselItem, styles.carouselItemWithShadow, { width: carouselWidth }]}
+                    >
+                      <PhotoAnalysisStage result={analysis.result} />
+                      <GlassCard style={styles.detailCard}>
+                        <DetailRow label={AppCopy.result.symptom} value={getSymptomSummary(analysis.result)} />
+                        <DetailRow
+                          label={AppCopy.result.suspectedDisease}
+                          value={analysis.result.diseases.join(', ') || AppCopy.result.noDisease}
+                        />
+                        <DetailRow
+                          label={AppCopy.result.observedPart}
+                          value={analysis.result.bodyParts.join(', ') || AppCopy.result.notDetected}
+                        />
+                      </GlassCard>
+                    </View>
+                  )}
+                  scrollEnabled={filteredAnalyses.length > 1}
+                  scrollEventThrottle={16}
+                  showsHorizontalScrollIndicator={false}
+                  snapToAlignment="start"
+                  snapToInterval={carouselPageInterval}
+                  style={styles.carouselList}
+                  windowSize={3}
+                />
               ) : (
                 <View style={styles.emptyStage}>
                   <Text selectable style={styles.emptyStageText}>
@@ -251,7 +303,7 @@ export default function ResultScreen() {
             {filteredAnalyses.length > 0 ? (
               <View style={styles.dots}>
                 {filteredAnalyses.map((analysis, index) => (
-                  <View key={analysis.id} style={[styles.dot, index === activeIndex && styles.dotActive]} />
+                  <View key={analysis.id} style={[styles.dot, index === visibleIndex && styles.dotActive]} />
                 ))}
               </View>
             ) : null}
@@ -267,10 +319,10 @@ export default function ResultScreen() {
         <>
           <View style={styles.captureHeader}>
             <Text selectable style={styles.captureTitle}>
-              {tank?.id ?? result.tankId}
+              {tank?.code ?? result.tankId}
             </Text>
             <Text selectable style={styles.captureTime}>
-              {tank?.groupId ?? AppCopy.common.tankGroupFallback} · {formatDateTime(result.capturedAt)}
+              {tank?.groupName ?? AppCopy.common.tankGroupFallback} · {formatDateTime(result.capturedAt)}
             </Text>
           </View>
 
@@ -282,17 +334,16 @@ export default function ResultScreen() {
 
           <ObjectFilters filter={filter} onSelect={selectFilter} />
 
-          <View style={styles.carouselShell} {...carouselPanResponder.panHandlers}>
+          <View style={styles.carouselShell}>
             {activeAnalysis ? (
-              <Animated.View
-                key={activeAnalysis.id}
-                style={[styles.carouselItem, { opacity: carouselOpacity }]}
-              >
+              <View key={activeAnalysis.id} style={styles.carouselItem}>
                 <PhotoAnalysisStage result={activeAnalysis.result} />
-                <View style={styles.photoStatus}>
-                  <StatusBadge status={activeAnalysis.status} compact binary />
-                </View>
-              </Animated.View>
+                {result.status !== 'failed' ? (
+                  <View style={styles.photoStatus}>
+                    <StatusBadge status={activeAnalysis.status} compact binary />
+                  </View>
+                ) : null}
+              </View>
             ) : (
               <View style={styles.emptyStage}>
                 <Text selectable style={styles.emptyStageText}>
@@ -305,7 +356,7 @@ export default function ResultScreen() {
           {filteredAnalyses.length > 1 ? (
             <View style={styles.dots}>
               {filteredAnalyses.map((analysis, index) => (
-                <View key={analysis.id} style={[styles.dot, index === activeIndex && styles.dotActive]} />
+                <View key={analysis.id} style={[styles.dot, index === visibleIndex && styles.dotActive]} />
               ))}
             </View>
           ) : null}
@@ -340,7 +391,8 @@ export default function ResultScreen() {
       )}
       </ScreenShell>
       <GuidanceModal
-        groupId={tank?.groupId ?? AppCopy.common.tankGroupFallback}
+        aiResultId={isActionableGrade(result.rawGrade) ? result.aiResultId : undefined}
+        groupId={tank?.groupName ?? AppCopy.common.tankGroupFallback}
         onClose={() => setIsGuidanceOpen(false)}
         visible={isGuidanceOpen}
       />
@@ -348,7 +400,16 @@ export default function ResultScreen() {
   );
 }
 
+function isActionableGrade(grade: InspectionResult['rawGrade']) {
+  return grade === 'suspect' || grade === 'warning';
+}
+
+function CarouselGap() {
+  return <View accessibilityElementsHidden importantForAccessibility="no" style={styles.carouselGap} />;
+}
+
 function CompletedSummary({
+  canOpenGuidance,
   capturedAt,
   groupId,
   onOpenGuidance,
@@ -356,6 +417,7 @@ function CompletedSummary({
   status,
   tankId,
 }: {
+  canOpenGuidance: boolean;
   capturedAt: string;
   groupId: string;
   onOpenGuidance: () => void;
@@ -372,7 +434,7 @@ function CompletedSummary({
     y: number;
   } | null>(null);
   const [isInfoPopoverOpen, setIsInfoPopoverOpen] = useState(false);
-  const totalCount = Math.max(response.totalCount, 1);
+  const totalCount = response.totalCount;
   const infectionRiskText = AppCopy.result.infectionRisk;
   const infoButtonAccessibilityLabel = `${AppCopy.result.tankGrade} 감염 의심 안내`;
   const gradeColor =
@@ -482,20 +544,22 @@ function CompletedSummary({
           </View>
         </View>
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={onOpenGuidance}
-          style={({ pressed }) => [styles.guidanceButton, pressed && styles.pressed]}
-        >
-          <Text selectable={false} style={styles.guidanceButtonText}>
-            {AppCopy.result.responsePlan}
-          </Text>
-          <View
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-            style={styles.guidanceChevron}
-          />
-        </Pressable>
+        {canOpenGuidance ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={onOpenGuidance}
+            style={({ pressed }) => [styles.guidanceButton, pressed && styles.pressed]}
+          >
+            <Text selectable={false} style={styles.guidanceButtonText}>
+              {AppCopy.result.responsePlan}
+            </Text>
+            <View
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              style={styles.guidanceChevron}
+            />
+          </Pressable>
+        ) : null}
       </View>
 
       <View style={styles.responseStats}>
@@ -733,17 +797,17 @@ function buildResultForObject(result: InspectionResult, object: InspectionObject
     ...result,
     grade: object.grade,
     photoUri: object.photoUri ?? result.photoUri,
-    bodyParts: object.bodyParts,
-    diseases: object.diseases,
+    bodyParts: object.symptomEvidence?.map(formatSymptomEvidence) ?? object.bodyParts,
+    diseases: unique(object.diseaseEvidence?.map((evidence) => evidence.label) ?? object.diseases),
     evidenceSummary: object.evidenceSummary,
     lesions: object.lesions,
   };
 }
 
-function buildTankResponse(analyses: ObjectAnalysis[]): TankResponse {
-  const totalCount = analyses.length;
+function buildTankResponse(result: InspectionResult | undefined, analyses: ObjectAnalysis[]): TankResponse {
+  const totalCount = result?.fishCount ?? analyses.length;
   const suspiciousAnalyses = analyses.filter((analysis) => analysis.status === 'suspicious');
-  const suspiciousCount = suspiciousAnalyses.length;
+  const suspiciousCount = result?.suspectCount ?? suspiciousAnalyses.length;
   const normalCount = Math.max(totalCount - suspiciousCount, 0);
   const diseaseLabels = unique(suspiciousAnalyses.flatMap((analysis) => analysis.result.diseases));
 
@@ -753,6 +817,16 @@ function buildTankResponse(analyses: ObjectAnalysis[]): TankResponse {
     normalCount,
     diseaseLabels,
   };
+}
+
+function formatSymptomEvidence(evidence: NonNullable<InspectionObject['symptomEvidence']>[number]) {
+  return evidence.confidence === undefined
+    ? evidence.label
+    : `${evidence.label} ${formatConfidence(evidence.confidence)}`;
+}
+
+function formatConfidence(value: number) {
+  return `${Math.round(value * 100)}%`;
 }
 
 function unique(values: string[]) {
@@ -1031,11 +1105,20 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     width: '100%',
   },
+  carouselList: {
+    flexGrow: 0,
+  },
+  carouselGap: {
+    width: CAROUSEL_PAGE_GAP,
+  },
   carouselItem: {
     gap: Space.sm,
     paddingBottom: Space.xs,
     position: 'relative',
     width: '100%',
+  },
+  carouselItemWithShadow: {
+    paddingBottom: Space.md,
   },
   photoStatus: {
     position: 'absolute',

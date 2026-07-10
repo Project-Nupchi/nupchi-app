@@ -1,5 +1,7 @@
 export type TankId = string;
 export type InspectionId = string;
+export type FishDiagnosisGrade = 'normal' | 'suspect';
+export type OverallDiagnosisGrade = FishDiagnosisGrade | 'warning';
 
 export type TankStatus = 'normal' | 'caution' | 'suspicious';
 export type InspectionStatus = 'pending' | 'completed' | 'failed';
@@ -16,54 +18,71 @@ export type LesionBox = {
 
 export type Tank = {
   id: TankId;
+  farmId: string;
+  code: string;
   groupId: string;
+  groupName: string;
   stockedInfo: string;
   createdAt: string;
   active: boolean;
 };
 
+export type DiseaseEvidence = {
+  code: string;
+  confidence: number;
+  label: string;
+};
+
+export type SymptomEvidence = {
+  code: string;
+  confidence?: number;
+  label: string;
+};
+
 export type InspectionObject = {
   id: string;
+  index?: number;
+  rawGrade?: FishDiagnosisGrade;
   grade: ObjectInspectionStatus;
   photoUri?: string;
+  bbox?: readonly [number, number, number, number];
+  segClass?: string;
+  segConfidence?: number;
   bodyParts: string[];
   diseases: string[];
+  diseaseEvidence?: DiseaseEvidence[];
+  symptomEvidence?: SymptomEvidence[];
   evidenceSummary: string;
   lesions: LesionBox[];
 };
 
 export type InspectionResult = {
   id: InspectionId;
+  aiResultId?: string;
+  requestId?: string;
   tankId: TankId;
   capturedAt: string;
   status: InspectionStatus;
+  rawGrade?: OverallDiagnosisGrade;
   grade: TankStatus;
   photoUri?: string;
+  imageWidth?: number;
+  imageHeight?: number;
   clues: string[];
   bodyParts: string[];
   diseases: string[];
+  fishCount?: number;
+  suspectCount?: number;
+  affectedRatio?: number;
+  inferenceMs?: number;
+  modelVersion?: string;
   evidenceSummary: string;
   lesions: LesionBox[];
   objects?: InspectionObject[];
 };
 
-export type UserSession = {
-  isLoggedIn: boolean;
-  farmName: string;
-  userId?: string;
-};
-
-export type LoginInput = {
-  farmName: string;
-};
-
-export type LoginResponse = {
-  session: UserSession;
-  accessToken?: string;
-};
-
-export type CreateTankInput = Pick<Tank, 'id' | 'groupId' | 'stockedInfo'>;
-export type UpdateTankInput = Pick<Tank, 'groupId' | 'stockedInfo' | 'active'>;
+export type CreateTankInput = Pick<Tank, 'code' | 'groupName' | 'stockedInfo'>;
+export type UpdateTankInput = Pick<Tank, 'groupName' | 'stockedInfo' | 'active'>;
 
 export type CreateInspectionInput = {
   tankId: TankId;
@@ -74,10 +93,6 @@ export type CreateInspectionInput = {
 export type AquacultureSnapshot = {
   tanks: Tank[];
   results: InspectionResult[];
-  preferences: {
-    ackedAlertIds: InspectionId[];
-    reminderEnabled: boolean;
-  };
 };
 
 export type MutationResult<T = undefined> =

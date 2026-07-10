@@ -13,7 +13,7 @@ export function buildPrototypeInspectionVerdict(result: InspectionResult) {
   return {
     ...result,
     status: 'completed',
-    grade: sample.grade ?? 'normal',
+    grade: sample.grade === 'normal' ? 'normal' : 'caution',
     bodyParts: sample.bodyParts ?? [],
     diseases: sample.diseases ?? [],
     evidenceSummary: sample.evidenceSummary ?? '',

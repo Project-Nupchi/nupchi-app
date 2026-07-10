@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -9,6 +9,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PhotoReviewScreen } from '@/components/photo-review-screen';
 import { FigmaTokens, Palette, Radius, Shadow, Space, Type } from '@/constants/aqua-theme';
 import { AppCopy } from '@/constants/copy';
+import {
+  prepareImageForUpload,
+  type PreparedImage,
+} from '@/services/image-upload';
 import { useAquaculture } from '@/state/aquaculture-store';
 
 // Figma camera design assets (node 202:253)
@@ -26,13 +30,28 @@ export default function CameraScreen() {
   const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraView>(null);
   const permissionRequestedRef = useRef(false);
+  const permissionRequestInFlightRef = useRef(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [mode, setMode] = useState<CaptureMode>('capture');
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [preparedImage, setPreparedImage] = useState<PreparedImage | null>(null);
   const [selectedTankId, setSelectedTankId] = useState<string | undefined>(tankId);
   const [cameraReady, setCameraReady] = useState(false);
+  const [cameraActive, setCameraActive] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const requestCameraPermissionSafely = useCallback(async () => {
+    if (permissionRequestInFlightRef.current) return undefined;
+    permissionRequestInFlightRef.current = true;
+    try {
+      return await requestCameraPermission();
+    } catch {
+      setMessage(AppCopy.camera.errors.cameraPermissionRequest);
+      return undefined;
+    } finally {
+      permissionRequestInFlightRef.current = false;
+    }
+  }, [requestCameraPermission]);
 
   useEffect(() => {
     if (mode !== 'capture') return;
@@ -43,20 +62,18 @@ export default function CameraScreen() {
       !permissionRequestedRef.current
     ) {
       permissionRequestedRef.current = true;
-      requestCameraPermission().catch(() => {
-        setMessage(AppCopy.camera.errors.cameraPermissionRequest);
-      });
+      void requestCameraPermissionSafely();
     }
-  }, [cameraPermission, mode, requestCameraPermission]);
+  }, [cameraPermission, mode, requestCameraPermissionSafely]);
 
   const startInspection = async () => {
-    if (!photoUri || !selectedTankId || !tanks.some((tank) => tank.id === selectedTankId)) return;
+    if (!preparedImage || !selectedTankId || !tanks.some((tank) => tank.id === selectedTankId && tank.active)) return;
 
     setMessage(null);
     setIsSubmitting(true);
 
     try {
-      const created = await createInspection({ tankId: selectedTankId, photoUri, clues: [] });
+      const created = await createInspection({ tankId: selectedTankId, image: preparedImage });
       if (!created.ok) {
         setMessage(created.message);
         return;
@@ -73,6 +90,7 @@ export default function CameraScreen() {
 
     setMessage(null);
     setIsSubmitting(true);
+    setCameraActive(false);
 
     try {
       // The system photo picker does not require full photo-library permission. Requesting it
@@ -85,22 +103,29 @@ export default function CameraScreen() {
       const picked = await ImagePicker.launchImageLibraryAsync({
         allowsEditing: false,
         mediaTypes: ['images'],
-        quality: 0.82,
+        preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Current,
+        quality: 1,
         selectionLimit: 1,
+        shouldDownloadFromNetwork: true,
       });
 
-      if (picked.canceled) return;
+      if (picked.canceled) {
+        setCameraActive(true);
+        return;
+      }
 
-      const photoUri = picked.assets?.[0]?.uri;
-      if (!photoUri) {
+      const asset = picked.assets?.[0];
+      if (!asset?.uri) {
+        setCameraActive(true);
         setMessage(AppCopy.camera.errors.selectedPhoto);
         return;
       }
 
-      setPhotoUri(photoUri);
+      setPreparedImage(await prepareImageForUpload(asset, { source: 'library' }));
       setMode('review');
-    } catch {
-      setMessage(AppCopy.camera.errors.gallery);
+    } catch (reason) {
+      setCameraActive(true);
+      setMessage(getImageErrorMessage(reason, AppCopy.camera.errors.gallery));
     } finally {
       setIsSubmitting(false);
     }
@@ -114,8 +139,8 @@ export default function CameraScreen() {
 
     try {
       if (!cameraPermission?.granted) {
-        const permission = await requestCameraPermission();
-        if (!permission.granted) {
+        const permission = await requestCameraPermissionSafely();
+        if (!permission?.granted) {
           setMessage(AppCopy.camera.errors.cameraPermission);
           return;
         }
@@ -132,10 +157,26 @@ export default function CameraScreen() {
         return;
       }
 
-      setPhotoUri(photo.uri);
+      const fileName = `nupchi-camera-${Date.now()}.${photo.format}`;
+      const mimeType = photo.format === 'png' ? 'image/png' : 'image/jpeg';
+      const file = Platform.OS === 'web' ? await createWebCameraFile(photo.uri, fileName, mimeType) : undefined;
+      setPreparedImage(
+        await prepareImageForUpload(
+          {
+            uri: photo.uri,
+            width: photo.width,
+            height: photo.height,
+            type: 'image',
+            fileName,
+            mimeType,
+            file,
+          },
+          { source: 'camera' }
+        )
+      );
       setMode('review');
-    } catch {
-      setMessage(AppCopy.camera.errors.savePhoto);
+    } catch (reason) {
+      setMessage(getImageErrorMessage(reason, AppCopy.camera.errors.savePhoto));
     } finally {
       setIsSubmitting(false);
     }
@@ -144,12 +185,13 @@ export default function CameraScreen() {
   const returnToCapture = () => {
     if (isSubmitting) return;
     setMessage(null);
-    setPhotoUri(null);
+    setPreparedImage(null);
     setCameraReady(false);
+    setCameraActive(true);
     setMode('capture');
   };
 
-  if (mode === 'review' && photoUri) {
+  if (mode === 'review' && preparedImage) {
     return (
       <PhotoReviewScreen
         bottomInset={insets.bottom}
@@ -158,7 +200,7 @@ export default function CameraScreen() {
         onBack={returnToCapture}
         onNext={startInspection}
         onSelectTank={setSelectedTankId}
-        photoUri={photoUri}
+        photoUri={preparedImage.uri}
         selectedTankId={selectedTankId}
         tanks={tanks}
         topInset={insets.top}
@@ -169,14 +211,15 @@ export default function CameraScreen() {
   return (
     <CameraCaptureView
       bottomInset={insets.bottom}
+      cameraActive={cameraActive}
       cameraReady={cameraReady}
       isSubmitting={isSubmitting}
       message={message}
       onCameraReady={() => setCameraReady(true)}
-      onClose={() => router.back()}
+      onClose={() => (router.canGoBack() ? router.back() : router.replace('/'))}
       onMountError={() => setMessage(AppCopy.camera.errors.mountCamera)}
       onPickFromGallery={pickFromGallery}
-      onRequestPermission={requestCameraPermission}
+      onRequestPermission={requestCameraPermissionSafely}
       onTakePhoto={takePhoto}
       permission={cameraPermission}
       refObject={cameraRef}
@@ -187,6 +230,7 @@ export default function CameraScreen() {
 
 function CameraCaptureView({
   bottomInset,
+  cameraActive,
   cameraReady,
   isSubmitting,
   message,
@@ -201,6 +245,7 @@ function CameraCaptureView({
   topInset,
 }: {
   bottomInset: number;
+  cameraActive: boolean;
   cameraReady: boolean;
   isSubmitting: boolean;
   message: string | null;
@@ -260,7 +305,7 @@ function CameraCaptureView({
 
     return (
       <CameraView
-        active={!isSubmitting}
+        active={cameraActive}
         ref={refObject}
         facing="back"
         onCameraReady={onCameraReady}
@@ -288,7 +333,11 @@ function CameraCaptureView({
       </View>
 
       {message ? (
-        <View style={[styles.cameraMessageBanner, { top: topInset + CAMERA_APP_BAR_HEIGHT + Space.sm }]}>
+        <View
+          accessibilityLiveRegion="assertive"
+          accessibilityRole="alert"
+          style={[styles.cameraMessageBanner, { top: topInset + CAMERA_APP_BAR_HEIGHT + Space.sm }]}
+        >
           <Text selectable style={styles.cameraMessageText}>
             {message}
           </Text>
@@ -372,6 +421,16 @@ function PermissionState({
       </Pressable>
     </View>
   );
+}
+
+async function createWebCameraFile(uri: string, fileName: string, mimeType: string) {
+  const response = await fetch(uri);
+  if (!response.ok) throw new Error(AppCopy.camera.errors.capturedPhoto);
+  return new File([await response.blob()], fileName, { type: mimeType });
+}
+
+function getImageErrorMessage(reason: unknown, fallback: string) {
+  return reason instanceof Error && reason.message ? reason.message : fallback;
 }
 
 const CAMERA_APP_BAR_HEIGHT = Space.lg * 3;

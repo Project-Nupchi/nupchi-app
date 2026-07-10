@@ -9,7 +9,7 @@ import { ScreenShell } from '@/components/screen-shell';
 import { StateChip } from '@/components/state-chip';
 import { Palette, Radius, Space, Type } from '@/constants/aqua-theme';
 import { AppCopy } from '@/constants/copy';
-import { getTankGroupStatus, getTankResults, statusLabel } from '@/domain/aquaculture';
+import { formatDateTime, getTankGroupStatus, getTankResults, statusLabel } from '@/domain/aquaculture';
 import type { InspectionResult, TankStatus } from '@/domain/aquaculture';
 import { useAquaculture } from '@/state/aquaculture-store';
 
@@ -65,14 +65,14 @@ export default function TankDetailScreen() {
             <View style={styles.heroCopy}>
               <View style={styles.tankTitleRow}>
                 <Text selectable style={styles.tankId}>
-                  {tank.id}
+                  {tank.code}
                 </Text>
                 <View style={[styles.heroStatus, { backgroundColor: statusTone[status].backgroundColor }]}>
                   <StatusMark color={statusTone[status].color} hero status={status} />
                 </View>
               </View>
               <Text selectable style={styles.groupText}>
-                {tank.groupId}
+                {tank.groupName}
                 {tank.active ? '' : AppCopy.tank.inactive}
               </Text>
               <Text selectable style={styles.stockedText}>
@@ -151,7 +151,7 @@ function InspectionCard({ result }: { result: InspectionResult }) {
       <GlassCard style={styles.recordCard}>
         <View style={styles.recordHeader}>
           <Text selectable style={styles.recordDate}>
-            {formatInspectionDate(result.capturedAt)}
+            {formatDateTime(result.capturedAt)}
           </Text>
           <Image accessible={false} source={chevronDarkImg} style={styles.recordChevron} contentFit="contain" />
         </View>
@@ -285,17 +285,6 @@ function SearchGlyph() {
       <View style={styles.searchHandle} />
     </View>
   );
-}
-
-function formatInspectionDate(value: string) {
-  return new Intl.DateTimeFormat('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  }).format(new Date(value));
 }
 
 const styles = StyleSheet.create({
