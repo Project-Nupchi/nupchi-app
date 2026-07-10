@@ -80,6 +80,10 @@ export function getLatestResult(results: InspectionResult[], tankId: string) {
   return getTankResults(results, tankId)[0];
 }
 
+export function getFirstTankPhotoUri(results: InspectionResult[], tankId: string) {
+  return getTankResults(results, tankId).find((result) => result.photoUri)?.photoUri;
+}
+
 export function sortTanksByRisk(tanks: Tank[], results: InspectionResult[]) {
   return [...tanks].sort((a, b) => {
     const statusDiff = statusWeight[getTankGroupStatus(tanks, results, a)] - statusWeight[getTankGroupStatus(tanks, results, b)];

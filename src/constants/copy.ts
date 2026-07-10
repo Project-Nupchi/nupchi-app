@@ -126,6 +126,11 @@ export const AppCopy = {
     checkingPermission: '카메라 권한을 확인하고 있습니다.',
     backToSelection: '수조 선택으로 돌아가기',
     framingGuide: '넙치의 윗면과 수평이 되도록 맞춰 주세요',
+    webTest: {
+      title: '웹에서는 사진 촬영이 제공되지 않아요',
+      subtitle: '아래 샘플 사진을 선택해 분석을 진행하세요',
+      imageLabel: (label: string) => `${label} 사진으로 분석`,
+    },
     review: {
       selectTank: '분석할 수조를 선택해 주세요',
       tankId: '수조 ID',

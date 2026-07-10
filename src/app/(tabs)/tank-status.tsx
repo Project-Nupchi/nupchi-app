@@ -20,6 +20,7 @@ import { AppCopy } from '@/constants/copy';
 import {
   Tank,
   TankStatus,
+  getFirstTankPhotoUri,
   getLatestResult,
   getTankGroupStatus,
   sortTanksByRisk,
@@ -129,6 +130,7 @@ export default function TankStatusScreen() {
 function TankListCard({ tank, status }: { tank: Tank; status: TankStatus }) {
   const { results } = useAquaculture();
   const latest = getLatestResult(results, tank.id);
+  const thumbnailUri = getFirstTankPhotoUri(results, tank.id);
   const lastCaptured = latest ? formatCapturedAt(latest.capturedAt) : AppCopy.tank.noCapture;
 
   return (
@@ -137,7 +139,11 @@ function TankListCard({ tank, status }: { tank: Tank; status: TankStatus }) {
       onPress={() => router.push({ pathname: '/tank/[tankId]', params: { tankId: tank.id } })}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
-      <Image source={tankThumbnailImg} style={styles.tankImage} contentFit="cover" />
+      <Image
+        source={thumbnailUri ? { uri: thumbnailUri } : tankThumbnailImg}
+        style={styles.tankImage}
+        contentFit="cover"
+      />
       <View style={styles.cardText}>
         <View style={styles.cardTitleRow}>
           <Text selectable style={styles.tankId}>

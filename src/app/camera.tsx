@@ -1,14 +1,24 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { Asset } from 'expo-asset';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PhotoReviewScreen } from '@/components/photo-review-screen';
 import { FigmaTokens, Palette, Radius, Shadow, Space, Type } from '@/constants/aqua-theme';
 import { AppCopy } from '@/constants/copy';
+import { WEB_TEST_IMAGES, type WebTestImage } from '@/constants/web-test-images';
 import {
   prepareImageForUpload,
   type PreparedImage,
@@ -25,6 +35,7 @@ type CaptureMode = 'capture' | 'review';
 // 카메라 FAB에서 바로 촬영 화면으로 진입한다. 촬영 또는 갤러리 선택을 마친 뒤
 // 실제 사진을 확인하고 수조를 선택한 시점에만 분석을 시작한다.
 export default function CameraScreen() {
+  const isWeb = Platform.OS === 'web';
   const { tankId } = useLocalSearchParams<{ tankId?: string }>();
   const { tanks, createInspection } = useAquaculture();
   const insets = useSafeAreaInsets();
@@ -54,6 +65,7 @@ export default function CameraScreen() {
   }, [requestCameraPermission]);
 
   useEffect(() => {
+    if (isWeb) return;
     if (mode !== 'capture') return;
     if (
       cameraPermission &&
@@ -64,7 +76,7 @@ export default function CameraScreen() {
       permissionRequestedRef.current = true;
       void requestCameraPermissionSafely();
     }
-  }, [cameraPermission, mode, requestCameraPermissionSafely]);
+  }, [cameraPermission, isWeb, mode, requestCameraPermissionSafely]);
 
   const startInspection = async () => {
     if (!preparedImage || !selectedTankId || !tanks.some((tank) => tank.id === selectedTankId && tank.active)) return;
@@ -182,6 +194,45 @@ export default function CameraScreen() {
     }
   };
 
+  // 웹 데모 전용: 실제 촬영 대신 미리 번들된 샘플 사진을 선택해 리뷰 단계로 넘긴다.
+  const selectTestImage = async (image: WebTestImage) => {
+    if (isSubmitting) return;
+
+    setMessage(null);
+    setIsSubmitting(true);
+
+    try {
+      const asset = Asset.fromModule(image.source);
+      if (!asset.uri) {
+        setMessage(AppCopy.camera.errors.selectedPhoto);
+        return;
+      }
+
+      const extension = image.mimeType === 'image/png' ? 'png' : 'jpg';
+      const fileName = `nupchi-${image.id}.${extension}`;
+      const file = await createWebCameraFile(asset.uri, fileName, image.mimeType);
+      setPreparedImage(
+        await prepareImageForUpload(
+          {
+            uri: asset.uri,
+            width: asset.width ?? 0,
+            height: asset.height ?? 0,
+            type: 'image',
+            fileName,
+            mimeType: image.mimeType,
+            file,
+          },
+          { source: 'camera' }
+        )
+      );
+      setMode('review');
+    } catch (reason) {
+      setMessage(getImageErrorMessage(reason, AppCopy.camera.errors.selectedPhoto));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const returnToCapture = () => {
     if (isSubmitting) return;
     setMessage(null);
@@ -203,6 +254,20 @@ export default function CameraScreen() {
         photoUri={preparedImage.uri}
         selectedTankId={selectedTankId}
         tanks={tanks}
+        topInset={insets.top}
+      />
+    );
+  }
+
+  if (isWeb) {
+    return (
+      <WebCaptureView
+        bottomInset={insets.bottom}
+        isSubmitting={isSubmitting}
+        message={message}
+        onClose={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+        onSelectImage={selectTestImage}
+        testImages={WEB_TEST_IMAGES}
         topInset={insets.top}
       />
     );
@@ -397,6 +462,96 @@ function CameraCaptureView({
   );
 }
 
+// 웹 데모 화면: 실제 카메라 대신 하단에서 준비된 샘플 사진 5장을 선택한다.
+function WebCaptureView({
+  bottomInset,
+  isSubmitting,
+  message,
+  onClose,
+  onSelectImage,
+  testImages,
+  topInset,
+}: {
+  bottomInset: number;
+  isSubmitting: boolean;
+  message: string | null;
+  onClose: () => void;
+  onSelectImage: (image: WebTestImage) => void;
+  testImages: WebTestImage[];
+  topInset: number;
+}) {
+  return (
+    <View style={styles.cameraRoot}>
+      <View style={[styles.cameraTopBar, { top: topInset }]}>
+        <Pressable
+          accessibilityLabel={AppCopy.camera.close}
+          accessibilityRole="button"
+          disabled={isSubmitting}
+          hitSlop={Space.sm}
+          onPress={onClose}
+          style={({ pressed }) => [styles.closeButton, pressed && styles.controlPressed]}
+        >
+          <Image contentFit="contain" source={closeImg} style={styles.closeIcon} />
+        </Pressable>
+      </View>
+
+      {message ? (
+        <View
+          accessibilityLiveRegion="assertive"
+          accessibilityRole="alert"
+          style={[styles.cameraMessageBanner, { top: topInset + CAMERA_APP_BAR_HEIGHT + Space.sm }]}
+        >
+          <Text selectable style={styles.cameraMessageText}>
+            {message}
+          </Text>
+        </View>
+      ) : null}
+
+      <View style={[styles.webStack, { top: topInset + CAMERA_APP_BAR_HEIGHT, bottom: bottomInset + Space.lg }]}>
+        <Image contentFit="contain" source={guideFrameImg} style={styles.webGuideFrame} />
+        <View style={[styles.guideChip, guideBlur]}>
+          <Text selectable={false} style={styles.guideText}>
+            {AppCopy.camera.framingGuide}
+          </Text>
+        </View>
+
+        <View style={styles.webThumbRow}>
+          {testImages.map((image) => (
+            <Pressable
+              accessibilityLabel={AppCopy.camera.webTest.imageLabel(image.label)}
+              accessibilityRole="button"
+              disabled={isSubmitting}
+              key={image.id}
+              onPress={() => onSelectImage(image)}
+              style={({ pressed }) => [
+                styles.webThumb,
+                isSubmitting && styles.disabled,
+                pressed && !isSubmitting && styles.controlPressed,
+              ]}
+            >
+              <Image contentFit="cover" source={image.source} style={styles.webThumbImage} />
+              <Text selectable={false} style={styles.webThumbLabel}>
+                {image.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <View style={styles.webNotice}>
+          <Text selectable={false} style={styles.webNoticeTitle}>
+            {AppCopy.camera.webTest.title}
+          </Text>
+          <Text selectable={false} style={styles.webNoticeSubtitle}>
+            {AppCopy.camera.webTest.subtitle}
+          </Text>
+        </View>
+
+        {isSubmitting ? <ActivityIndicator color={Palette.white} /> : null}
+      </View>
+    </View>
+  );
+}
+
 function PermissionState({
   body,
   buttonLabel,
@@ -438,6 +593,11 @@ const GUIDE_ASPECT_RATIO = 275 / 168;
 const SHUTTER_SIZE = 78;
 const SHUTTER_INNER_SIZE = 56;
 const GALLERY_BUTTON_SIZE = 64;
+// 모바일 화면을 기준으로 한 줄에 3개가 들어가도록 크기와 행 최대 폭을 맞춘다(위 3개·아래 2개).
+const WEB_THUMB_SIZE = 88;
+const WEB_THUMB_GAP = Space.sm + Space.xs;
+const WEB_THUMBS_PER_ROW = 3;
+const WEB_THUMB_ROW_MAX_WIDTH = WEB_THUMBS_PER_ROW * WEB_THUMB_SIZE + (WEB_THUMBS_PER_ROW - 1) * WEB_THUMB_GAP;
 
 const guideBlur =
   Platform.OS === 'web'
@@ -617,5 +777,60 @@ const styles = StyleSheet.create({
   controlPressed: {
     opacity: 0.78,
     transform: [{ scale: 0.96 }],
+  },
+  webStack: {
+    alignItems: 'center',
+    gap: Space.lg,
+    justifyContent: 'center',
+    left: 0,
+    paddingHorizontal: Space.md,
+    position: 'absolute',
+    right: 0,
+    zIndex: 2,
+  },
+  webGuideFrame: {
+    aspectRatio: GUIDE_ASPECT_RATIO,
+    maxWidth: 220,
+    width: '55%',
+  },
+  webThumbRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: WEB_THUMB_GAP,
+    justifyContent: 'center',
+    maxWidth: WEB_THUMB_ROW_MAX_WIDTH,
+  },
+  webThumb: {
+    alignItems: 'center',
+    gap: Space.xs,
+    width: WEB_THUMB_SIZE,
+  },
+  webNotice: {
+    alignItems: 'center',
+    gap: Space.xxs,
+  },
+  webNoticeTitle: {
+    color: Palette.white,
+    textAlign: 'center',
+    ...Type.body2,
+  },
+  webNoticeSubtitle: {
+    color: Palette.inkMuted,
+    textAlign: 'center',
+    ...Type.caption,
+  },
+  webThumbImage: {
+    backgroundColor: FigmaTokens.color.gray[500],
+    borderColor: FigmaTokens.color.white[20],
+    borderRadius: Radius.image,
+    borderWidth: 1,
+    height: WEB_THUMB_SIZE,
+    width: WEB_THUMB_SIZE,
+  },
+  webThumbLabel: {
+    color: Palette.inkMuted,
+    textAlign: 'center',
+    ...Type.caption,
   },
 });
