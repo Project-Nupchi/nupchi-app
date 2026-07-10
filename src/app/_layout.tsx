@@ -1,9 +1,10 @@
 import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
-import { Palette } from '@/constants/aqua-theme';
+import { ChevronBackButton } from '@/components/chevron-back-button';
+import { Palette, Type } from '@/constants/aqua-theme';
 import { AppCopy } from '@/constants/copy';
-import { AquacultureProvider, useAquaculture } from '@/state/aquaculture-store';
+import { AquacultureProvider } from '@/state/aquaculture-store';
 
 // 물빛 그라디언트 배경 위에서 헤더는 투명하게 띄운다
 const tideTheme = {
@@ -27,36 +28,37 @@ export default function RootLayout() {
 }
 
 function RootNavigator() {
-  const { session } = useAquaculture();
-
   return (
     <ThemeProvider value={tideTheme}>
       <StatusBar style="light" />
       <Stack
-        screenOptions={{
+        screenOptions={({ navigation }) => ({
           headerTransparent: true,
           headerShadowVisible: false,
           headerTintColor: Palette.onGradient,
-          headerTitleStyle: { color: Palette.onGradient, fontWeight: '800' },
+          headerLeft: ({ canGoBack, tintColor }) =>
+            canGoBack ? (
+              <ChevronBackButton
+                color={tintColor ?? Palette.onGradient}
+                onPress={() => navigation.goBack()}
+              />
+            ) : null,
+          headerTitleAlign: 'center',
+          headerTitleStyle: { color: Palette.onGradient, ...Type.title },
           contentStyle: { backgroundColor: Palette.canvas },
-        }}
+        })}
       >
-        <Stack.Protected guard={session.isLoggedIn}>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="tank/[tankId]" options={{ title: '' }} />
-          <Stack.Screen name="camera" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
-          <Stack.Screen name="result/[resultId]" options={{ title: AppCopy.navigation.result }} />
-          <Stack.Screen name="guidance/[resultId]" options={{ title: AppCopy.navigation.guidance }} />
-          <Stack.Screen
-            name="add-tank"
-            options={{
-              headerShown: false,
-            }}
-          />
-        </Stack.Protected>
-        <Stack.Protected guard={!session.isLoggedIn}>
-          <Stack.Screen name="login" options={{ headerShown: false }} />
-        </Stack.Protected>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false, title: AppCopy.navigation.home }} />
+        <Stack.Screen name="tank/[tankId]" options={{ title: AppCopy.navigation.tankInfo }} />
+        <Stack.Screen name="camera" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+        <Stack.Screen name="result/[resultId]" options={{ title: AppCopy.navigation.result }} />
+        <Stack.Screen name="guidance/[resultId]" options={{ title: AppCopy.navigation.guidance }} />
+        <Stack.Screen
+          name="add-tank"
+          options={{
+            headerShown: false,
+          }}
+        />
       </Stack>
     </ThemeProvider>
   );

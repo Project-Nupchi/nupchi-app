@@ -47,6 +47,18 @@ export const FigmaTokens = {
       800: '#12477D',
       900: '#0B2E50',
     },
+    // 상세 화면에서 사용하는 최신 Figma blue scale (107:278, 156:1801)
+    detailBlue: {
+      100: '#E7F3FE',
+      200: '#C3E0FD',
+      300: '#93C7FB',
+      500: '#2A91F8',
+      600: '#0775E3',
+    },
+    overlay: {
+      detailAccent8: '#2A91F814',
+      modalDim: '#000000B2',
+    },
     status: {
       dangerText: '#EE2C1D',
       dangerBackground: '#F7534626',
@@ -59,10 +71,16 @@ export const FigmaTokens = {
   gradient: {
     screen: ['#4B9AE9', '#78B3EF', '#A5CCF4', '#D2E6FA', '#FFFFFF'] as const,
     locations: [0, 0.2, 0.4, 0.62, 0.88] as const,
+    detailScreen: ['#5FADFA', '#95C8FC', '#CAE4FD', '#FFFFFF'] as const,
+    detailLocations: [0, 0.32, 0.62, 0.92] as const,
+    photoReview: ['#2A91F8', '#459FF9', '#5FADFA', '#95C8FC', '#CAE4FD', '#FFFFFF'] as const,
+    photoReviewLocations: [0, 0.125, 0.25, 0.5, 0.75, 1] as const,
   },
   radius: {
     card: 20,
+    heroCard: 28,
     image: 12,
+    analysisImage: 24,
     roundButton: 40,
     control: 16,
     pill: 999,
@@ -83,6 +101,7 @@ export const FigmaTokens = {
     heading1: { fontFamily: 'Pretendard', fontSize: 20, fontWeight: '700', lineHeight: 26, letterSpacing: -0.2 },
     heading2: { fontFamily: 'Pretendard', fontSize: 18, fontWeight: '600', lineHeight: 25, letterSpacing: -0.36 },
     body1: { fontFamily: 'Pretendard', fontSize: 16, fontWeight: '600', lineHeight: 22, letterSpacing: -0.32 },
+    body1Medium: { fontFamily: 'Pretendard', fontSize: 16, fontWeight: '500', lineHeight: 22, letterSpacing: -0.32 },
     body2: { fontFamily: 'Pretendard', fontSize: 14, fontWeight: '500', lineHeight: 20, letterSpacing: -0.14 },
     button: { fontFamily: 'Pretendard', fontSize: 16, fontWeight: '700', lineHeight: 22, letterSpacing: -0.32 },
     fieldLabel: { fontFamily: 'Pretendard', fontSize: 14, fontWeight: '600', lineHeight: 20, letterSpacing: 0 },
@@ -113,6 +132,10 @@ export const FigmaTokens = {
 export const Gradient = {
   colors: FigmaTokens.gradient.screen,
   locations: FigmaTokens.gradient.locations,
+  detailColors: FigmaTokens.gradient.detailScreen,
+  detailLocations: FigmaTokens.gradient.detailLocations,
+  photoReviewColors: FigmaTokens.gradient.photoReview,
+  photoReviewLocations: FigmaTokens.gradient.photoReviewLocations,
 };
 
 export const Palette = {
@@ -136,6 +159,7 @@ export const Palette = {
 
   // 솔리드 표면 (입력창 등)
   surface: FigmaTokens.color.white[100],
+  surfaceMuted: FigmaTokens.color.gray[50],
   canvas: FigmaTokens.color.white[100],
 
   // 브랜드/액션
@@ -144,6 +168,17 @@ export const Palette = {
   onPrimary: FigmaTokens.color.white[100],
   primarySoft: FigmaTokens.color.blue[100],
   accent: FigmaTokens.color.blue[700],
+
+  // 상세 화면의 선택 상태·진단 태그·카운트
+  detailAccent: FigmaTokens.color.detailBlue[500],
+  detailAccentDisabled: FigmaTokens.color.detailBlue[300],
+  detailAccentSoft: FigmaTokens.color.detailBlue[100],
+  detailAccentTint: FigmaTokens.color.overlay.detailAccent8,
+  modalDim: FigmaTokens.color.overlay.modalDim,
+  diagnosisTag: FigmaTokens.color.detailBlue[200],
+  detailCount: FigmaTokens.color.detailBlue[600],
+  paginationInactive: FigmaTokens.color.gray[200],
+  analysisLoadingText: FigmaTokens.color.gray[800],
 
   // FAB·카메라 등 어두운 요소
   ink: FigmaTokens.color.gray[950],
@@ -183,7 +218,9 @@ export const Water = {
 
 export const Radius = {
   card: FigmaTokens.radius.card,
+  heroCard: FigmaTokens.radius.heroCard,
   image: FigmaTokens.radius.image,
+  analysisImage: FigmaTokens.radius.analysisImage,
   roundButton: FigmaTokens.radius.roundButton,
   button: FigmaTokens.radius.control,
   input: FigmaTokens.radius.control,
@@ -207,3 +244,14 @@ export const Shadow = {
 } as const;
 
 export const Type = FigmaTokens.typography;
+
+// 분석 대기 화면 (Figma 202:1641) 전용 치수와 모션 타이밍
+export const AnalysisLoading = {
+  contentTopRatio: 0.275,
+  fishSize: 152,
+  magnifierSize: 62,
+  orbitSize: 140,
+  stageSize: 202,
+  spinnerSize: 28,
+  loopDuration: 2000,
+} as const;

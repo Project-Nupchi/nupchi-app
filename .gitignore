@@ -46,3 +46,7 @@ example
 /ios
 /android
 /build/
+
+# generated artifacts
+/generated/
+/tmp/

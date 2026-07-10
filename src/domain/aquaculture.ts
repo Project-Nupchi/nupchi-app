@@ -47,10 +47,11 @@ export const flounderDiseaseLabels = [
 export function formatDateTime(value: string) {
   return new Intl.DateTimeFormat('ko-KR', {
     timeZone: 'Asia/Seoul',
-    month: '2-digit',
-    day: '2-digit',
+    month: 'long',
+    day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    hour12: true,
   }).format(new Date(value));
 }
 
@@ -61,7 +62,7 @@ export function getTankResults(results: InspectionResult[], tankId: string) {
 }
 
 export function getCurrentStatus(results: InspectionResult[], tankId: string): TankStatus {
-  return getTankResults(results, tankId)[0]?.grade ?? 'normal';
+  return getTankResults(results, tankId).find((result) => result.status === 'completed')?.grade ?? 'normal';
 }
 
 export function getTankGroupStatus(tanks: Tank[], results: InspectionResult[], tank: Tank): TankStatus {

@@ -33,7 +33,7 @@
       "clues": ["무리 이탈", "체색"],
       "bodyParts": ["체표", "지느러미 기부"],
       "diseases": ["연쇄구균증", "비브리오병"],
-      "evidenceSummary": "체표 측면의 출혈성 병변 후보와 지느러미 기부 변색이 함께 감지되었습니다.",
+      "evidenceSummary": "체표 측면의 출혈성 병변 후보와 지느러미 변색이 함께 감지됐어요.",
       "lesions": [
         { "id": "l1", "x": 28, "y": 33, "width": 20, "height": 16, "label": "체표 홍반" },
         { "id": "l2", "x": 58, "y": 48, "width": 16, "height": 14, "label": "기부 변색" }
@@ -65,6 +65,69 @@
           "diseases": [],
           "evidenceSummary": "3번 개체에서는 명확한 병변 후보가 감지되지 않았습니다.",
           "lesions": []
+        },
+        {
+          "id": "obj-a07-4",
+          "grade": "suspicious",
+          "photoUri": "mock://a07-object-4",
+          "bodyParts": ["체표"],
+          "diseases": ["연쇄구균증"],
+          "evidenceSummary": "4번 개체 체표 측면에서 홍반 후보가 감지되었습니다.",
+          "lesions": [{ "id": "l4", "x": 42, "y": 43, "width": 21, "height": 22, "label": "체표 홍반" }]
+        },
+        {
+          "id": "obj-a07-5",
+          "grade": "normal",
+          "photoUri": "mock://a07-object-5",
+          "bodyParts": ["체표"],
+          "diseases": [],
+          "evidenceSummary": "5번 개체에서는 명확한 병변 후보가 감지되지 않았습니다.",
+          "lesions": []
+        },
+        {
+          "id": "obj-a07-6",
+          "grade": "normal",
+          "photoUri": "mock://a07-object-6",
+          "bodyParts": ["체표"],
+          "diseases": [],
+          "evidenceSummary": "6번 개체에서는 명확한 병변 후보가 감지되지 않았습니다.",
+          "lesions": []
+        },
+        {
+          "id": "obj-a07-7",
+          "grade": "normal",
+          "photoUri": "mock://a07-object-7",
+          "bodyParts": ["체표"],
+          "diseases": [],
+          "evidenceSummary": "7번 개체에서는 명확한 병변 후보가 감지되지 않았습니다.",
+          "lesions": []
+        },
+        {
+          "id": "obj-a07-8",
+          "grade": "normal",
+          "photoUri": "mock://a07-object-8",
+          "bodyParts": ["체표"],
+          "diseases": [],
+          "evidenceSummary": "8번 개체에서는 명확한 병변 후보가 감지되지 않았습니다.",
+          "lesions": []
+        },
+        {
+          "id": "obj-a07-9",
+          "grade": "normal",
+          "photoUri": "mock://a07-object-9",
+          "bodyParts": ["체표"],
+          "diseases": [],
+          "evidenceSummary": "9번 개체에서는 명확한 병변 후보가 감지되지 않았습니다.",
+          "lesions": []
+        },
+        {
+          "id": "obj-a07-10",
+          "grade": "normal",
+          "photoUri": "mock://a07-object-10",
+          "bodyParts": ["체표"],
+          "diseases": [],
+          "evidenceSummary": "10번 개체에서는 명확한 병변 후보가 감지되지 않았습니다.",
+          "lesions": []
         }
       ]
     },
@@ -77,7 +140,7 @@
       "clues": ["섭이"],
       "bodyParts": ["체표"],
       "diseases": ["림포시스티스병"],
-      "evidenceSummary": "작은 표피 손상 후보가 있으나 경계가 약합니다. 동일 개체 재촬영을 권장합니다.",
+      "evidenceSummary": "작은 표피 손상 후보가 있으나 경계가 약해요. 동일 개체 재촬영을 권장드려요.",
       "lesions": [{ "id": "l1", "x": 46, "y": 38, "width": 12, "height": 10, "label": "약한 반점" }],
       "objects": [
         {

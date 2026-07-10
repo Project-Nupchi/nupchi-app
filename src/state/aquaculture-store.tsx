@@ -1,4 +1,4 @@
-import React, { PropsWithChildren, createContext, useCallback, useMemo, useRef, useState } from 'react';
+import React, { PropsWithChildren, createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { AppCopy } from '@/constants/copy';
 import type {
@@ -35,10 +35,11 @@ type AquacultureStore = {
 };
 
 const emptySession: UserSession = { isLoggedIn: false, farmName: '' };
+const initialSession: UserSession = { isLoggedIn: false, farmName: AppCopy.login.defaultFarmName };
 const AquacultureContext = createContext<AquacultureStore | null>(null);
 
 export function AquacultureProvider({ children }: PropsWithChildren) {
-  const [session, setSession] = useState<UserSession>(emptySession);
+  const [session, setSession] = useState<UserSession>(initialSession);
   const [tanks, setTanks] = useState<Tank[]>([]);
   const [results, setResults] = useState<InspectionResult[]>([]);
   const [ackedAlertIds, setAckedAlertIds] = useState<string[]>([]);
@@ -47,6 +48,7 @@ export function AquacultureProvider({ children }: PropsWithChildren) {
   const [mutationCount, setMutationCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const analyzingIds = useRef(new Set<string>());
+  const hasBootstrapped = useRef(false);
 
   const hydrate = useCallback(async () => {
     const snapshot = await aquacultureApi.getSnapshot();
@@ -72,6 +74,12 @@ export function AquacultureProvider({ children }: PropsWithChildren) {
       setIsHydrating(false);
     }
   }, [hydrate]);
+
+  useEffect(() => {
+    if (hasBootstrapped.current) return;
+    hasBootstrapped.current = true;
+    void login(AppCopy.login.defaultFarmName);
+  }, [login]);
 
   const logout = useCallback(async () => {
     try {

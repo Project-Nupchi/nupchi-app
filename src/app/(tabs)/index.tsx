@@ -24,6 +24,8 @@ const statusIcons: Record<TankStatus, number> = {
   normal: require('../../../assets/images/home/status-good.png'),
 };
 
+const APP_BAR_HEIGHT = Space.lg * 3;
+
 export default function HomeScreen() {
   const { session, tanks, results } = useAquaculture();
   const insets = useSafeAreaInsets();
@@ -58,33 +60,49 @@ export default function HomeScreen() {
         style={StyleSheet.absoluteFill}
       />
 
+      <View
+        accessibilityLabel={`현재 양식장 ${session.farmName}`}
+        accessible
+        style={[
+          styles.appBar,
+          { height: insets.top + APP_BAR_HEIGHT, paddingTop: insets.top + Space.md },
+        ]}
+      >
+        <View style={styles.locationRow}>
+          <View style={styles.mapPinSlot}>
+            <Image source={mapPinImg} style={styles.mapPin} contentFit="contain" />
+          </View>
+          <Text numberOfLines={1} selectable style={styles.locationText}>
+            {session.farmName}
+          </Text>
+        </View>
+      </View>
+
       <ScrollView
+        contentInsetAdjustmentBehavior="never"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scroll, { paddingBottom: Space.xl, paddingTop: insets.top + Space.md }]}
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingBottom: Space.xl, paddingTop: insets.top + APP_BAR_HEIGHT + Space.md },
+        ]}
       >
         <View style={styles.container}>
-          {/* 위치 헤더 */}
-          <View style={styles.locationRow}>
-            <Image source={mapPinImg} style={styles.mapPin} contentFit="contain" />
-            <Text selectable style={styles.locationText}>
-              {session.farmName}
-            </Text>
-          </View>
-
           {/* 헤드라인 + CTA */}
           <View style={styles.headlineBlock}>
-            <Text selectable style={styles.headlineSub}>
-              {AppCopy.home.todayStatus}
-            </Text>
-            {headline ? (
-              <Text selectable style={styles.headline}>
-                {AppCopy.home.alertHeadline(headline.grade, headline.count)}
+            <View style={styles.headlineCopy}>
+              <Text selectable style={styles.headlineSub}>
+                {AppCopy.home.todayStatus}
               </Text>
-            ) : (
-              <Text selectable style={styles.headline}>
-                {AppCopy.home.allNormal}
-              </Text>
-            )}
+              {headline ? (
+                <Text selectable style={styles.headline}>
+                  {AppCopy.home.alertHeadline(headline.grade, headline.count)}
+                </Text>
+              ) : (
+                <Text selectable style={styles.headline}>
+                  {AppCopy.home.allNormal}
+                </Text>
+              )}
+            </View>
             <Pressable
               accessibilityRole="button"
               disabled={!worstTankId}
@@ -174,26 +192,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.lg,
     width: '100%',
   },
+  appBar: {
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    left: 0,
+    paddingHorizontal: Space.lg,
+    pointerEvents: 'box-none',
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 4,
+  },
   locationRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 6,
-    minHeight: 44,
+    maxWidth: 520,
+  },
+  mapPinSlot: {
+    alignItems: 'center',
+    height: 24,
+    justifyContent: 'center',
+    width: 24,
   },
   mapPin: {
-    height: 20,
-    width: 20,
+    height: 16,
+    width: 16,
   },
   locationText: {
-    color: Palette.white,
-    ...Type.title,
+    color: Palette.onGradient,
+    flexShrink: 1,
+    ...Type.body1,
   },
   headlineBlock: {
     alignItems: 'flex-start',
     gap: Space.md,
-    marginTop: Space.xs,
     position: 'relative',
     zIndex: 3,
+  },
+  headlineCopy: {
+    alignItems: 'flex-start',
+    gap: Space.xs,
   },
   headlineSub: {
     color: Palette.onGradientMuted,

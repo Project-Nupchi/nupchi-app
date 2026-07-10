@@ -1,25 +1,37 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
-  ActivityIndicator,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
+  Animated,
+  Dimensions,
+  Modal,
+  PanResponder,
+  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionButton } from '@/components/action-button';
+import { AnalysisLoadingScreen } from '@/components/analysis-loading-screen';
 import { GlassCard } from '@/components/glass-card';
+import { GuidanceModal } from '@/components/guidance-modal';
 import { PhotoAnalysisStage } from '@/components/photo-analysis-stage';
 import { ScreenShell } from '@/components/screen-shell';
 import { StatusBadge } from '@/components/status-badge';
 import { Palette, Radius, Shadow, Space, Type } from '@/constants/aqua-theme';
 import { AppCopy } from '@/constants/copy';
-import { InspectionObject, InspectionResult, LesionBox, ObjectInspectionStatus, formatDateTime } from '@/domain/aquaculture';
+import {
+  InspectionObject,
+  InspectionResult,
+  LesionBox,
+  ObjectInspectionStatus,
+  formatDateTime,
+  statusLabel,
+} from '@/domain/aquaculture';
 import { buildPrototypeInspectionVerdict } from '@/services/inspection-server';
 import { useAquaculture } from '@/state/aquaculture-store';
 
@@ -33,15 +45,10 @@ type ObjectAnalysis = {
 };
 
 type TankResponse = {
-  status: ObjectStatus;
   totalCount: number;
   suspiciousCount: number;
   normalCount: number;
-  title: string;
   diseaseLabels: string[];
-  affectedParts: string[];
-  summaryAction: string;
-  steps: { index: string; title: string; body: string }[];
 };
 
 const filters: { key: ObjectFilter; label: string }[] = [
@@ -50,17 +57,30 @@ const filters: { key: ObjectFilter; label: string }[] = [
   { key: 'suspicious', label: AppCopy.result.filters.suspicious },
 ];
 
+const resultStatusIcons: Record<InspectionResult['grade'], number> = {
+  suspicious: require('../../../assets/images/home/status-warn.png'),
+  caution: require('../../../assets/images/home/status-suspect.png'),
+  normal: require('../../../assets/images/home/status-good.png'),
+};
+
+const INFO_POPOVER_WIDTH = 217;
+const APP_BAR_HEIGHT = Space.lg * 3;
+const INFO_BUTTON_SIZE = Space.lg;
+const INFO_BUTTON_HIT_SLOP = (Space.xxl + Space.sm - INFO_BUTTON_SIZE) / 2;
+
 // 분석 결과 — 촬영 후 서버 판정을 대기/완료/실패로 표시
 export default function ResultScreen() {
   const { resultId } = useLocalSearchParams<{ resultId: string }>();
   const { results, tanks, apiMode, analyzeInspection, applyInspectionVerdict, retryInspection } = useAquaculture();
   const insets = useSafeAreaInsets();
-  const carouselRef = useRef<ScrollView>(null);
+  const [carouselOpacity] = useState(() => new Animated.Value(1));
+  const [isCarouselTransitioning, setIsCarouselTransitioning] = useState(false);
   const [filter, setFilter] = useState<ObjectFilter>('all');
   const [activeIndex, setActiveIndex] = useState(0);
-  const [carouselWidth, setCarouselWidth] = useState(0);
+  const [isGuidanceOpen, setIsGuidanceOpen] = useState(false);
   const result = results.find((item) => item.id === resultId);
   const tank = result ? tanks.find((item) => item.id === result.tankId) : undefined;
+  const contentTop = Platform.OS === 'ios' ? Space.sm : insets.top + APP_BAR_HEIGHT + Space.sm;
 
   useEffect(() => {
     if (result?.status !== 'pending') return;
@@ -77,26 +97,71 @@ export default function ResultScreen() {
     () => objectAnalyses.filter((item) => filter === 'all' || item.status === filter),
     [filter, objectAnalyses]
   );
-  const activeAnalysis = filteredAnalyses[activeIndex] ?? filteredAnalyses[0];
-  const tankResponse = useMemo(
-    () => buildTankResponse(result, objectAnalyses, tank?.groupId),
-    [objectAnalyses, result, tank?.groupId]
-  );
+  const tankResponse = useMemo(() => buildTankResponse(objectAnalyses), [objectAnalyses]);
 
   const selectFilter = (nextFilter: ObjectFilter) => {
+    carouselOpacity.stopAnimation();
+    carouselOpacity.setValue(1);
+    setIsCarouselTransitioning(false);
     setActiveIndex(0);
-    carouselRef.current?.scrollTo({ x: 0, animated: false });
     setFilter(nextFilter);
   };
 
-  const onCarouselEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (carouselWidth <= 0) return;
-    setActiveIndex(Math.round(event.nativeEvent.contentOffset.x / carouselWidth));
-  };
+  const showAnalysis = useCallback((index: number) => {
+    if (filteredAnalyses.length === 0 || isCarouselTransitioning) return;
+    const nextIndex = Math.max(0, Math.min(index, filteredAnalyses.length - 1));
+    if (nextIndex === activeIndex) return;
+
+    setIsCarouselTransitioning(true);
+    Animated.timing(carouselOpacity, {
+      duration: 90,
+      toValue: 0,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (!finished) {
+        carouselOpacity.setValue(1);
+        setIsCarouselTransitioning(false);
+        return;
+      }
+
+      setActiveIndex(nextIndex);
+      requestAnimationFrame(() => {
+        Animated.timing(carouselOpacity, {
+          duration: 140,
+          toValue: 1,
+          useNativeDriver: true,
+        }).start(() => {
+          setIsCarouselTransitioning(false);
+        });
+      });
+    });
+  }, [activeIndex, carouselOpacity, filteredAnalyses.length, isCarouselTransitioning]);
+
+  const carouselPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          filteredAnalyses.length > 1 &&
+          Math.abs(gesture.dx) > 12 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2,
+        onMoveShouldSetPanResponderCapture: (_, gesture) =>
+          filteredAnalyses.length > 1 &&
+          Math.abs(gesture.dx) > 12 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2,
+        onPanResponderRelease: (_, gesture) => {
+          if (Math.abs(gesture.dx) < 48 && Math.abs(gesture.vx) < 0.45) return;
+          showAnalysis(activeIndex + (gesture.dx < 0 ? 1 : -1));
+        },
+        onPanResponderTerminationRequest: () => false,
+      }),
+    [activeIndex, filteredAnalyses.length, showAnalysis]
+  );
+
+  const activeAnalysis = filteredAnalyses[activeIndex] ?? filteredAnalyses[0];
 
   if (!result) {
     return (
-      <ScreenShell contentStyle={styles.content}>
+      <ScreenShell contentStyle={styles.content} gradient="detail">
         <GlassCard style={styles.panel}>
           <Text selectable style={styles.title}>
             {AppCopy.result.notFound}
@@ -107,126 +172,90 @@ export default function ResultScreen() {
     );
   }
 
+  if (result.status === 'pending') {
+    return <AnalysisLoadingScreen />;
+  }
+
   return (
-    <ScreenShell contentStyle={styles.content} topInset={insets.top + 60}>
-      <View style={styles.captureHeader}>
-        <Text selectable style={styles.captureTitle}>
-          {tank?.id ?? result.tankId}
-        </Text>
-        <Text selectable style={styles.captureTime}>
-          {tank?.groupId ?? AppCopy.common.tankGroupFallback} · {formatDateTime(result.capturedAt)}
-        </Text>
-      </View>
-
-      {result.status === 'completed' ? (
-        <TankResponseCard response={tankResponse} reportTitle={AppCopy.result.reportTitle(tank?.id ?? result.tankId)} />
-      ) : null}
-
-      <View style={styles.objectSectionHeader}>
-        <Text selectable style={styles.objectSectionTitle}>
-          {AppCopy.result.objectDetails}
-        </Text>
-      </View>
-
-      <View style={styles.filterRow}>
-        {filters.map((item) => (
-          <Pressable
-            key={item.key}
-            accessibilityRole="button"
-            onPress={() => selectFilter(item.key)}
-            style={({ pressed }) => [
-              styles.filterChip,
-              filter === item.key && styles.filterChipActive,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text selectable={false} style={[styles.filterText, filter === item.key && styles.filterTextActive]}>
-              {item.label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-
-      <View
-        style={styles.carouselShell}
-        onLayout={(event) => setCarouselWidth(event.nativeEvent.layout.width)}
-      >
-        {filteredAnalyses.length > 0 && carouselWidth > 0 ? (
-          <ScrollView
-            ref={carouselRef}
-            horizontal
-            onMomentumScrollEnd={onCarouselEnd}
-            pagingEnabled
-            scrollEventThrottle={16}
-            showsHorizontalScrollIndicator={false}
-          >
-            {filteredAnalyses.map((analysis) => (
-              <View key={analysis.id} style={[styles.carouselItem, { width: carouselWidth }]}>
-                <PhotoAnalysisStage result={analysis.result} />
-                <View style={styles.photoStatus}>
-                  <StatusBadge status={analysis.status} compact binary />
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-        ) : (
-          <View style={styles.emptyStage}>
-            <Text selectable style={styles.emptyStageText}>
-              {AppCopy.result.emptyFilter}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {filteredAnalyses.length > 1 ? (
-        <View style={styles.dots}>
-          {filteredAnalyses.map((analysis, index) => (
-            <View key={analysis.id} style={[styles.dot, index === activeIndex && styles.dotActive]} />
-          ))}
-        </View>
-      ) : null}
-
-      {result.status === 'pending' ? (
-        <GlassCard style={styles.pending}>
-          <ActivityIndicator color={Palette.primary} />
-          <Text selectable style={styles.pendingTitle}>
-            {AppCopy.result.pendingTitle}
-          </Text>
-          <Text selectable style={styles.body}>
-            {AppCopy.result.pendingBody}
-          </Text>
-        </GlassCard>
-      ) : null}
-
-      {result.status === 'failed' ? (
-        <GlassCard style={styles.panel}>
-          <Text selectable style={styles.title}>
-            {AppCopy.result.failedTitle}
-          </Text>
-          <Text selectable style={styles.body}>
-            {result.evidenceSummary}
-          </Text>
-          <View style={styles.failedActions}>
-            <ActionButton label={AppCopy.common.retry} icon="arrow.clockwise" onPress={() => retryInspection(result.id)} style={styles.grow} />
-            {apiMode === 'mock' ? (
-              <ActionButton label={AppCopy.result.sampleFallback} variant="secondary" onPress={applyPrototypeFallback} style={styles.grow} />
-            ) : null}
-          </View>
-        </GlassCard>
-      ) : null}
-
+    <>
+      <ScreenShell contentStyle={styles.content} gradient="detail" topInset={contentTop}>
       {result.status === 'completed' ? (
         <>
-          {activeAnalysis ? (
-            <GlassCard style={styles.detailCard}>
-              <Text selectable style={styles.detailTitle}>
-                {AppCopy.result.selectedObject}
+          <CompletedSummary
+            capturedAt={result.capturedAt}
+            groupId={tank?.groupId ?? AppCopy.common.tankGroupFallback}
+            onOpenGuidance={() => setIsGuidanceOpen(true)}
+            response={tankResponse}
+            status={result.grade}
+            tankId={tank?.id ?? result.tankId}
+          />
+
+          <View style={styles.completedAnalysis}>
+            <ObjectFilters filter={filter} onSelect={selectFilter} />
+
+            <View style={styles.analysisHeading}>
+              <Text selectable style={styles.objectSectionTitle}>
+                {AppCopy.result.objectDetails}
               </Text>
-              <DetailRow label={AppCopy.result.symptom} value={getSymptomSummary(activeAnalysis.result)} />
-              <DetailRow label={AppCopy.result.suspectedDisease} value={activeAnalysis.result.diseases.join(', ') || AppCopy.result.noDisease} />
-              <DetailRow label={AppCopy.result.observedPart} value={activeAnalysis.result.bodyParts.join(', ') || AppCopy.result.notDetected} />
-            </GlassCard>
-          ) : null}
+              <View style={styles.pager}>
+                <PagerButton
+                  accessibilityLabel="이전 개체"
+                  disabled={isCarouselTransitioning || activeIndex <= 0 || filteredAnalyses.length === 0}
+                  direction="previous"
+                  onPress={() => showAnalysis(activeIndex - 1)}
+                />
+                <Text selectable style={styles.pagerText}>
+                  {filteredAnalyses.length === 0 ? 0 : activeIndex + 1}/{filteredAnalyses.length}
+                </Text>
+                <PagerButton
+                  accessibilityLabel="다음 개체"
+                  disabled={
+                    isCarouselTransitioning ||
+                    activeIndex >= filteredAnalyses.length - 1 ||
+                    filteredAnalyses.length === 0
+                  }
+                  direction="next"
+                  onPress={() => showAnalysis(activeIndex + 1)}
+                />
+              </View>
+            </View>
+
+            <View style={styles.carouselShell} {...carouselPanResponder.panHandlers}>
+              {activeAnalysis ? (
+                <Animated.View
+                  key={activeAnalysis.id}
+                  style={[styles.carouselItem, { opacity: carouselOpacity }]}
+                >
+                  <PhotoAnalysisStage result={activeAnalysis.result} />
+                  <GlassCard style={styles.detailCard}>
+                    <DetailRow label={AppCopy.result.symptom} value={getSymptomSummary(activeAnalysis.result)} />
+                    <DetailRow
+                      label={AppCopy.result.suspectedDisease}
+                      value={activeAnalysis.result.diseases.join(', ') || AppCopy.result.noDisease}
+                    />
+                    <DetailRow
+                      label={AppCopy.result.observedPart}
+                      value={activeAnalysis.result.bodyParts.join(', ') || AppCopy.result.notDetected}
+                    />
+                  </GlassCard>
+                </Animated.View>
+              ) : (
+                <View style={styles.emptyStage}>
+                  <Text selectable style={styles.emptyStageText}>
+                    {AppCopy.result.emptyFilter}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {filteredAnalyses.length > 0 ? (
+              <View style={styles.dots}>
+                {filteredAnalyses.map((analysis, index) => (
+                  <View key={analysis.id} style={[styles.dot, index === activeIndex && styles.dotActive]} />
+                ))}
+              </View>
+            ) : null}
+          </View>
 
           <View style={styles.notice}>
             <Text selectable style={styles.noticeText}>
@@ -234,71 +263,419 @@ export default function ResultScreen() {
             </Text>
           </View>
         </>
-      ) : null}
+      ) : (
+        <>
+          <View style={styles.captureHeader}>
+            <Text selectable style={styles.captureTitle}>
+              {tank?.id ?? result.tankId}
+            </Text>
+            <Text selectable style={styles.captureTime}>
+              {tank?.groupId ?? AppCopy.common.tankGroupFallback} · {formatDateTime(result.capturedAt)}
+            </Text>
+          </View>
 
-    </ScreenShell>
+          <View style={styles.objectSectionHeader}>
+            <Text selectable style={styles.objectSectionTitle}>
+              {AppCopy.result.objectDetails}
+            </Text>
+          </View>
+
+          <ObjectFilters filter={filter} onSelect={selectFilter} />
+
+          <View style={styles.carouselShell} {...carouselPanResponder.panHandlers}>
+            {activeAnalysis ? (
+              <Animated.View
+                key={activeAnalysis.id}
+                style={[styles.carouselItem, { opacity: carouselOpacity }]}
+              >
+                <PhotoAnalysisStage result={activeAnalysis.result} />
+                <View style={styles.photoStatus}>
+                  <StatusBadge status={activeAnalysis.status} compact binary />
+                </View>
+              </Animated.View>
+            ) : (
+              <View style={styles.emptyStage}>
+                <Text selectable style={styles.emptyStageText}>
+                  {AppCopy.result.emptyFilter}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {filteredAnalyses.length > 1 ? (
+            <View style={styles.dots}>
+              {filteredAnalyses.map((analysis, index) => (
+                <View key={analysis.id} style={[styles.dot, index === activeIndex && styles.dotActive]} />
+              ))}
+            </View>
+          ) : null}
+
+          {result.status === 'failed' ? (
+            <GlassCard style={styles.panel}>
+              <Text selectable style={styles.title}>
+                {AppCopy.result.failedTitle}
+              </Text>
+              <Text selectable style={styles.body}>
+                {result.evidenceSummary}
+              </Text>
+              <View style={styles.failedActions}>
+                <ActionButton
+                  label={AppCopy.common.retry}
+                  icon="arrow.clockwise"
+                  onPress={() => retryInspection(result.id)}
+                  style={styles.grow}
+                />
+                {apiMode === 'mock' ? (
+                  <ActionButton
+                    label={AppCopy.result.sampleFallback}
+                    onPress={applyPrototypeFallback}
+                    style={styles.grow}
+                    variant="secondary"
+                  />
+                ) : null}
+              </View>
+            </GlassCard>
+          ) : null}
+        </>
+      )}
+      </ScreenShell>
+      <GuidanceModal
+        groupId={tank?.groupId ?? AppCopy.common.tankGroupFallback}
+        onClose={() => setIsGuidanceOpen(false)}
+        visible={isGuidanceOpen}
+      />
+    </>
   );
 }
 
-function TankResponseCard({ response, reportTitle }: { response: TankResponse; reportTitle: string }) {
-  const isSuspicious = response.status === 'suspicious';
+function CompletedSummary({
+  capturedAt,
+  groupId,
+  onOpenGuidance,
+  response,
+  status,
+  tankId,
+}: {
+  capturedAt: string;
+  groupId: string;
+  onOpenGuidance: () => void;
+  response: TankResponse;
+  status: InspectionResult['grade'];
+  tankId: string;
+}) {
+  const infoButtonRef = useRef<View>(null);
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+  const [infoButtonLayout, setInfoButtonLayout] = useState<{
+    height: number;
+    width: number;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [isInfoPopoverOpen, setIsInfoPopoverOpen] = useState(false);
   const totalCount = Math.max(response.totalCount, 1);
+  const infectionRiskText = AppCopy.result.infectionRisk;
+  const infoButtonAccessibilityLabel = `${AppCopy.result.tankGrade} 감염 의심 안내`;
+  const gradeColor =
+    status === 'normal' ? Palette.normal : status === 'caution' ? Palette.caution : Palette.suspicious;
+  const popoverWidth = Math.min(INFO_POPOVER_WIDTH, windowWidth - Space.md * 2);
+  const popoverLeft = infoButtonLayout
+    ? Math.max(
+        Space.md,
+        Math.min(
+          infoButtonLayout.x + infoButtonLayout.width / 2 - popoverWidth / 2,
+          windowWidth - popoverWidth - Space.md
+        )
+      )
+    : Space.md;
+  const arrowHalfWidth = Space.sm - Space.xxs;
+  const arrowLeft = infoButtonLayout
+    ? Math.max(
+        Space.md - arrowHalfWidth,
+        Math.min(
+          infoButtonLayout.x + infoButtonLayout.width / 2 - popoverLeft - arrowHalfWidth,
+          popoverWidth - Space.md - arrowHalfWidth
+        )
+      )
+    : Space.lg;
+  const infoIconTop = infoButtonLayout
+    ? infoButtonLayout.y + (infoButtonLayout.height - Space.md) / 2
+    : 0;
+
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', () => {
+      setInfoButtonLayout(null);
+      setIsInfoPopoverOpen(false);
+    });
+
+    return () => subscription.remove();
+  }, []);
+
+  const closeInfoPopover = () => {
+    setIsInfoPopoverOpen(false);
+  };
+
+  const toggleInfoPopover = () => {
+    if (isInfoPopoverOpen) {
+      closeInfoPopover();
+      return;
+    }
+
+    infoButtonRef.current?.measureInWindow((x, y, width, height) => {
+      setInfoButtonLayout({ height, width, x, y });
+      setIsInfoPopoverOpen(true);
+    });
+  };
 
   return (
-    <GlassCard emphasis="strong" style={styles.responseCard}>
-      <View style={styles.responseHeader}>
-        <View style={styles.responseTitleBlock}>
-          <Text selectable style={styles.responseTitle}>
-            {reportTitle}
-          </Text>
+    <View style={styles.completedSummary}>
+      <View style={styles.summaryTop}>
+        <View style={styles.summaryMeta}>
+          <View style={styles.tankNameRow}>
+            <Text selectable style={styles.captureTitle}>
+              {tankId}
+            </Text>
+            <Text selectable style={styles.tankGroup}>
+              {groupId}
+            </Text>
+          </View>
+
+          <MetaRow label={AppCopy.result.capturedAt} value={formatDateTime(capturedAt)} />
+
+          <View style={styles.metaRow}>
+            <Text selectable style={styles.metaLabel}>
+              {AppCopy.result.tankGrade}
+            </Text>
+            <View style={styles.metaDivider} />
+            <View style={styles.gradeValue}>
+              <Image
+                accessibilityIgnoresInvertColors
+                accessible={false}
+                source={resultStatusIcons[status]}
+                style={[styles.gradeIcon, { tintColor: gradeColor }]}
+                contentFit="contain"
+              />
+              <Text selectable style={styles.metaValue}>
+                {statusLabel[status]}
+              </Text>
+              {response.suspiciousCount > 0 ? (
+                <Pressable
+                  ref={infoButtonRef}
+                  accessibilityLabel={infoButtonAccessibilityLabel}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: isInfoPopoverOpen }}
+                  hitSlop={INFO_BUTTON_HIT_SLOP}
+                  onPress={toggleInfoPopover}
+                  style={({ pressed }) => [styles.infoButton, pressed && styles.pressed]}
+                >
+                  <View
+                    accessibilityElementsHidden
+                    importantForAccessibility="no-hide-descendants"
+                    style={styles.infoIcon}
+                  >
+                    <Text selectable={false} style={styles.infoIconText}>
+                      i
+                    </Text>
+                  </View>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
         </View>
-        <StatusBadge status={response.status} compact binary />
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={onOpenGuidance}
+          style={({ pressed }) => [styles.guidanceButton, pressed && styles.pressed]}
+        >
+          <Text selectable={false} style={styles.guidanceButtonText}>
+            {AppCopy.result.responsePlan}
+          </Text>
+          <View
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={styles.guidanceChevron}
+          />
+        </Pressable>
       </View>
 
       <View style={styles.responseStats}>
-        <ResponseMetric label={AppCopy.result.suspicious} value={`${response.suspiciousCount}/${totalCount}`} emphasized={isSuspicious} />
-        <ResponseMetric label={AppCopy.result.normal} value={`${response.normalCount}/${totalCount}`} />
-        <ResponseMetric label={AppCopy.result.diseaseCandidate} value={response.diseaseLabels.join(', ') || AppCopy.result.none} />
+        <ResponseMetric
+          label={AppCopy.result.healthyObjects}
+          tone="normal"
+          value={`${response.normalCount}/${totalCount}`}
+        />
+        <ResponseMetric
+          label={AppCopy.result.suspiciousObjects}
+          tone="suspicious"
+          value={`${response.suspiciousCount}/${totalCount}`}
+        />
+        <ResponseMetric
+          label={AppCopy.result.diseaseDiagnosis}
+          tone="diagnosis"
+          value={response.diseaseLabels.join(', ') || AppCopy.result.none}
+        />
       </View>
 
-      <View style={styles.stepList}>
-        {response.steps.map((step) => (
-          <Step key={step.index} status={response.status} {...step} />
-        ))}
-      </View>
-
-      <View style={styles.summaryAction}>
-        <Text selectable style={styles.summaryActionLabel}>
-          {AppCopy.result.overallAction}
-        </Text>
-        <Text selectable style={styles.summaryActionText}>
-          {response.summaryAction}
-        </Text>
-      </View>
-    </GlassCard>
+      <Modal
+        animationType="fade"
+        onRequestClose={closeInfoPopover}
+        presentationStyle="overFullScreen"
+        statusBarTranslucent
+        transparent
+        visible={isInfoPopoverOpen && infoButtonLayout !== null}
+      >
+        <View
+          accessibilityViewIsModal
+          onAccessibilityEscape={closeInfoPopover}
+          style={styles.popoverLayer}
+        >
+          <Pressable
+            accessible={false}
+            onPress={closeInfoPopover}
+            style={StyleSheet.absoluteFill}
+          />
+          {infoButtonLayout ? (
+            <>
+              <Pressable
+                accessibilityLabel={infoButtonAccessibilityLabel}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: true }}
+                onPress={closeInfoPopover}
+                style={[
+                  styles.popoverInfoButton,
+                  {
+                    height: infoButtonLayout.height,
+                    left: infoButtonLayout.x,
+                    top: infoButtonLayout.y,
+                    width: infoButtonLayout.width,
+                  },
+                ]}
+              />
+              <View
+                accessible
+                accessibilityLabel={infectionRiskText}
+                accessibilityLiveRegion="polite"
+                accessibilityRole="text"
+                style={[
+                  styles.infectionTooltip,
+                  {
+                    bottom: Math.max(Space.md, windowHeight - infoIconTop + Space.xxs),
+                    left: popoverLeft,
+                    width: popoverWidth,
+                  },
+                ]}
+              >
+                <View style={[styles.tooltipBubble, { width: popoverWidth }]}>
+                  <Text selectable style={styles.tooltipText}>
+                    {infectionRiskText}
+                  </Text>
+                </View>
+                <View style={[styles.tooltipArrow, { marginLeft: arrowLeft }]} />
+              </View>
+            </>
+          ) : null}
+        </View>
+      </Modal>
+    </View>
   );
 }
 
 function ResponseMetric({
   label,
+  tone,
   value,
-  emphasized = false,
-  wide = false,
 }: {
   label: string;
+  tone: 'normal' | 'suspicious' | 'diagnosis';
   value: string;
-  emphasized?: boolean;
-  wide?: boolean;
 }) {
+  const valueColor =
+    tone === 'normal' ? Palette.normal : tone === 'suspicious' ? Palette.caution : Palette.inkOverlay;
+
   return (
-    <View style={[styles.responseMetric, wide && styles.responseMetricWide, emphasized && styles.responseMetricEmphasized]}>
+    <View style={styles.responseMetric}>
       <Text selectable style={styles.responseMetricLabel}>
         {label}
       </Text>
-      <Text selectable style={[styles.responseMetricValue, emphasized && styles.responseMetricValueEmphasized]}>
+      <Text
+        selectable
+        style={[
+          styles.responseMetricValue,
+          tone === 'diagnosis' && styles.responseMetricDiagnosis,
+          { color: valueColor },
+        ]}
+      >
         {value}
       </Text>
     </View>
+  );
+}
+
+function MetaRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.metaRow}>
+      <Text selectable style={styles.metaLabel}>
+        {label}
+      </Text>
+      <View style={styles.metaDivider} />
+      <Text selectable style={styles.metaValue}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function ObjectFilters({ filter, onSelect }: { filter: ObjectFilter; onSelect: (filter: ObjectFilter) => void }) {
+  return (
+    <View style={styles.filterRow}>
+      {filters.map((item) => (
+        <Pressable
+          key={item.key}
+          accessibilityRole="button"
+          accessibilityState={{ selected: filter === item.key }}
+          onPress={() => onSelect(item.key)}
+          style={({ pressed }) => [
+            styles.filterChip,
+            filter === item.key && styles.filterChipActive,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text selectable={false} style={[styles.filterText, filter === item.key && styles.filterTextActive]}>
+            {item.label}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+function PagerButton({
+  accessibilityLabel,
+  direction,
+  disabled,
+  onPress,
+}: {
+  accessibilityLabel: string;
+  direction: 'previous' | 'next';
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      hitSlop={Space.sm}
+      onPress={onPress}
+      style={({ pressed }) => [styles.pagerButton, disabled && styles.pagerButtonDisabled, pressed && styles.pressed]}
+    >
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={direction === 'previous' ? styles.pagerPreviousIcon : styles.pagerNextIcon}
+      />
+    </Pressable>
   );
 }
 
@@ -363,47 +740,18 @@ function buildResultForObject(result: InspectionResult, object: InspectionObject
   };
 }
 
-function buildTankResponse(result: InspectionResult | undefined, analyses: ObjectAnalysis[], groupId?: string): TankResponse {
+function buildTankResponse(analyses: ObjectAnalysis[]): TankResponse {
   const totalCount = analyses.length;
   const suspiciousAnalyses = analyses.filter((analysis) => analysis.status === 'suspicious');
   const suspiciousCount = suspiciousAnalyses.length;
   const normalCount = Math.max(totalCount - suspiciousCount, 0);
-  const status: ObjectStatus = suspiciousCount > 0 ? 'suspicious' : 'normal';
   const diseaseLabels = unique(suspiciousAnalyses.flatMap((analysis) => analysis.result.diseases));
-  const affectedParts = unique(suspiciousAnalyses.flatMap((analysis) => analysis.result.bodyParts));
-  const groupName = groupId ?? AppCopy.common.sharedGroupFallback;
-
-  if (!result || status === 'normal') {
-    return {
-      status: 'normal',
-      totalCount,
-      suspiciousCount,
-      normalCount,
-      title: AppCopy.result.normalResponseTitle,
-      diseaseLabels,
-      affectedParts,
-      summaryAction: AppCopy.result.normalResponseAction,
-      steps: [
-        { index: '1', title: AppCopy.result.regularCaptureTitle, body: AppCopy.result.regularCaptureBody },
-        { index: '2', title: AppCopy.result.preserveRecordsTitle, body: AppCopy.result.preserveRecordsBody(groupName) },
-      ],
-    };
-  }
 
   return {
-    status,
     totalCount,
     suspiciousCount,
     normalCount,
-    title: AppCopy.result.suspiciousResponseTitle,
     diseaseLabels,
-    affectedParts,
-    summaryAction: AppCopy.result.suspiciousResponseAction(groupName),
-    steps: [
-      { index: '1', title: AppCopy.result.separateRouteTitle, body: AppCopy.result.separateRouteBody(groupName) },
-      { index: '2', title: AppCopy.result.recaptureTitle, body: AppCopy.result.recaptureBody(suspiciousCount) },
-      { index: '3', title: AppCopy.result.expertReviewTitle, body: AppCopy.result.expertReviewBody },
-    ],
   };
 }
 
@@ -422,33 +770,173 @@ function getSymptomSummary(result: InspectionResult) {
   return result.lesions.map((lesion) => lesion.label).join(', ') || result.bodyParts.join(', ') || AppCopy.result.noFinding;
 }
 
-function Step({ index, title, body, status }: { index: string; title: string; body: string; status: ObjectStatus }) {
-  return (
-    <View style={styles.step}>
-      <View style={[styles.stepNum, status === 'normal' && styles.stepNumNormal]}>
-        <Text selectable={false} style={[styles.stepNumText, status === 'normal' && styles.stepNumTextNormal]}>
-          {index}
-        </Text>
-      </View>
-      <View style={styles.stepText}>
-        <Text selectable style={styles.stepTitle}>
-          {title}
-        </Text>
-        <Text selectable style={styles.stepBody}>
-          {body}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   content: {
+    alignSelf: 'center',
     gap: Space.md,
     maxWidth: 560,
     width: '100%',
-    alignSelf: 'center',
-    paddingTop: 0,
+  },
+  completedSummary: {
+    gap: Space.md,
+  },
+  summaryTop: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  summaryMeta: {
+    flex: 1,
+    gap: Space.xxs,
+    minWidth: 0,
+  },
+  tankNameRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: Space.sm,
+  },
+  tankGroup: {
+    color: Palette.onGradient,
+    ...Type.body2,
+    fontWeight: Type.body2.fontWeight,
+  },
+  metaRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: Space.sm,
+  },
+  metaLabel: {
+    color: Palette.onGradientMuted,
+    ...Type.body2,
+  },
+  metaDivider: {
+    backgroundColor: Palette.onGradientMuted,
+    height: Space.md - Space.xs,
+    width: 1,
+  },
+  metaValue: {
+    color: Palette.onGradient,
+    ...Type.fieldLabel,
+  },
+  gradeValue: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: Space.sm,
+  },
+  gradeIcon: {
+    height: Space.md,
+    width: Space.md,
+  },
+  infoButton: {
+    alignItems: 'center',
+    height: INFO_BUTTON_SIZE,
+    justifyContent: 'center',
+    width: INFO_BUTTON_SIZE,
+  },
+  infoIcon: {
+    alignItems: 'center',
+    borderColor: Palette.onGradient,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    height: Space.md,
+    justifyContent: 'center',
+    width: Space.md,
+  },
+  infoIconText: {
+    color: Palette.onGradient,
+    ...Type.label3,
+  },
+  guidanceButton: {
+    alignItems: 'center',
+    backgroundColor: Palette.glassStrong,
+    borderRadius: Radius.roundButton,
+    flexDirection: 'row',
+    gap: Space.xxs,
+    height: Space.xxl + Space.sm,
+    justifyContent: 'center',
+    marginLeft: Space.sm,
+    width: 108,
+  },
+  guidanceButtonText: {
+    color: Palette.detailAccent,
+    ...Type.body1,
+  },
+  guidanceChevron: {
+    borderBottomColor: Palette.detailAccent,
+    borderBottomWidth: 1.5,
+    borderRightColor: Palette.detailAccent,
+    borderRightWidth: 1.5,
+    height: Space.sm,
+    transform: [{ rotate: '-45deg' }],
+    width: Space.sm,
+  },
+  responseStats: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+    gap: Space.sm,
+  },
+  responseMetric: {
+    alignItems: 'center',
+    backgroundColor: Palette.glass,
+    borderColor: Palette.glassLine,
+    borderRadius: Radius.card,
+    borderWidth: 1,
+    flex: 1,
+    gap: Space.sm - Space.xxs,
+    justifyContent: 'center',
+    minHeight: 88,
+    minWidth: 0,
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.sm + Space.xxs,
+    ...Shadow.card,
+  },
+  responseMetricLabel: {
+    color: Palette.textMuted,
+    textAlign: 'center',
+    ...Type.body2,
+  },
+  responseMetricValue: {
+    textAlign: 'center',
+    ...Type.heading2,
+  },
+  responseMetricDiagnosis: {
+    ...Type.label1,
+  },
+  infectionTooltip: {
+    position: 'absolute',
+    zIndex: 2,
+  },
+  popoverLayer: {
+    flex: 1,
+  },
+  popoverInfoButton: {
+    position: 'absolute',
+    zIndex: 1,
+  },
+  tooltipArrow: {
+    alignSelf: 'flex-start',
+    borderLeftColor: 'transparent',
+    borderLeftWidth: Space.sm - Space.xxs,
+    borderRightColor: 'transparent',
+    borderRightWidth: Space.sm - Space.xxs,
+    borderTopColor: Palette.textSubtle,
+    borderTopWidth: Space.sm - Space.xxs,
+    height: 0,
+    width: 0,
+  },
+  tooltipBubble: {
+    alignItems: 'center',
+    backgroundColor: Palette.textSubtle,
+    borderRadius: Radius.button,
+    paddingVertical: Space.sm,
+  },
+  tooltipText: {
+    color: Palette.onGradient,
+    ...Type.label2,
+  },
+  completedAnalysis: {
+    gap: Space.md,
+    marginTop: Space.lg,
   },
   captureHeader: {
     alignItems: 'flex-start',
@@ -464,75 +952,57 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     ...Type.label2,
   },
-  responseCard: {
-    gap: Space.lg,
-    padding: Space.lg,
-  },
-  responseHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: Space.md,
-    justifyContent: 'space-between',
-  },
-  responseTitleBlock: {
-    flex: 1,
-    gap: Space.xs,
-  },
-  responseTitle: {
-    color: Palette.text,
-    ...Type.heading1,
-  },
-  responseStats: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Space.sm,
-  },
-  responseMetric: {
-    backgroundColor: Palette.glassMuted,
-    borderRadius: Radius.button,
-    flex: 1,
-    gap: Space.xs,
-    minWidth: 0,
-    paddingHorizontal: Space.md,
-    paddingVertical: Space.sm,
-  },
-  responseMetricWide: {
-    flexBasis: '100%',
-  },
-  responseMetricEmphasized: {
-    backgroundColor: Palette.suspiciousBg,
-  },
-  responseMetricLabel: {
-    color: Palette.textSubtle,
-    ...Type.label3,
-  },
-  responseMetricValue: {
-    color: Palette.text,
-    ...Type.label2,
-  },
-  responseMetricValueEmphasized: {
-    color: Palette.suspicious,
-  },
-  summaryAction: {
-    backgroundColor: Palette.glassMuted,
-    borderRadius: Radius.button,
-    gap: Space.xs,
-    padding: Space.md,
-  },
-  summaryActionLabel: {
-    color: Palette.textSubtle,
-    ...Type.label3,
-  },
-  summaryActionText: {
-    color: Palette.text,
-    ...Type.body2,
-  },
   objectSectionHeader: {
     marginTop: Space.sm,
   },
   objectSectionTitle: {
-    color: 'rgba(20, 23, 30, 0.8)',
+    color: Palette.text,
     ...Type.heading2,
+  },
+  analysisHeading: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  pager: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: Space.xs,
+  },
+  pagerButton: {
+    alignItems: 'center',
+    height: Space.lg,
+    justifyContent: 'center',
+    width: Space.lg,
+  },
+  pagerButtonDisabled: {
+    opacity: 0.45,
+  },
+  pagerPreviousIcon: {
+    borderBottomColor: 'transparent',
+    borderBottomWidth: Space.xs,
+    borderRightColor: Palette.textMuted,
+    borderRightWidth: Space.sm - Space.xxs,
+    borderTopColor: 'transparent',
+    borderTopWidth: Space.xs,
+    height: 0,
+    width: 0,
+  },
+  pagerNextIcon: {
+    borderBottomColor: 'transparent',
+    borderBottomWidth: Space.xs,
+    borderLeftColor: Palette.textMuted,
+    borderLeftWidth: Space.sm - Space.xxs,
+    borderTopColor: 'transparent',
+    borderTopWidth: Space.xs,
+    height: 0,
+    width: 0,
+  },
+  pagerText: {
+    color: Palette.textMuted,
+    minWidth: Space.xxl,
+    textAlign: 'center',
+    ...Type.fieldLabel,
   },
   filterRow: {
     alignItems: 'center',
@@ -540,30 +1010,32 @@ const styles = StyleSheet.create({
     gap: Space.sm,
   },
   filterChip: {
-    backgroundColor: Palette.glass,
-    borderColor: Palette.glassLine,
+    backgroundColor: Palette.glassMuted,
     borderRadius: Radius.pill,
-    borderWidth: 1,
-    paddingHorizontal: Space.md,
+    paddingHorizontal: Space.md - Space.xs,
     paddingVertical: Space.sm,
-    ...Shadow.card,
   },
   filterChipActive: {
-    backgroundColor: Palette.white,
-    borderColor: Palette.white,
+    backgroundColor: Palette.detailAccentSoft,
   },
   filterText: {
-    color: Palette.textMuted,
-    ...Type.label2,
+    color: Palette.textSubtle,
+    ...Type.fieldLabel,
   },
   filterTextActive: {
-    color: Palette.primary,
+    color: Palette.detailAccent,
   },
   carouselShell: {
-    minHeight: 260,
+    marginTop: -Space.xs,
+    minHeight: 217,
+    overflow: 'hidden',
+    width: '100%',
   },
   carouselItem: {
+    gap: Space.sm,
+    paddingBottom: Space.xs,
     position: 'relative',
+    width: '100%',
   },
   photoStatus: {
     position: 'absolute',
@@ -572,10 +1044,10 @@ const styles = StyleSheet.create({
   },
   emptyStage: {
     alignItems: 'center',
-    aspectRatio: 4 / 3,
+    aspectRatio: 353 / 217,
     backgroundColor: Palette.glass,
     borderColor: Palette.glassLine,
-    borderRadius: Radius.card,
+    borderRadius: Radius.analysisImage,
     borderWidth: 1,
     justifyContent: 'center',
     ...Shadow.card,
@@ -592,23 +1064,13 @@ const styles = StyleSheet.create({
     marginTop: -Space.xs,
   },
   dot: {
-    backgroundColor: Palette.glassLine,
+    backgroundColor: Palette.paginationInactive,
     borderRadius: Radius.pill,
-    height: 6,
-    width: 6,
+    height: 5,
+    width: 5,
   },
   dotActive: {
-    backgroundColor: Palette.primary,
-    width: 18,
-  },
-  pending: {
-    alignItems: 'center',
-    gap: Space.sm,
-    padding: Space.xl,
-  },
-  pendingTitle: {
-    color: Palette.text,
-    ...Type.heading1,
+    backgroundColor: Palette.detailAccent,
   },
   panel: {
     gap: Space.md,
@@ -627,80 +1089,33 @@ const styles = StyleSheet.create({
     ...Type.body2,
     textAlign: 'center',
   },
-  gradeKicker: {
-    color: Palette.textSubtle,
-    ...Type.label3,
-    textTransform: 'uppercase',
-  },
   detailCard: {
     gap: Space.md,
     padding: Space.lg,
   },
-  detailTitle: {
-    color: Palette.text,
-    ...Type.heading1,
-  },
   detailRow: {
     alignItems: 'flex-start',
     flexDirection: 'row',
-    gap: Space.md,
+    gap: Space.md - Space.xxs,
   },
   detailLabel: {
-    color: Palette.textSubtle,
-    ...Type.label2,
-    width: 72,
-  },
-  detailValue: {
-    color: Palette.text,
-    flex: 1,
-    ...Type.body1,
-  },
-  stepList: {
-    gap: Space.md,
-  },
-  step: {
-    flexDirection: 'row',
-    gap: Space.md,
-  },
-  stepNum: {
-    alignItems: 'center',
-    backgroundColor: Palette.suspiciousBg,
-    borderRadius: Radius.pill,
-    height: 32,
-    justifyContent: 'center',
-    width: 32,
-  },
-  stepNumNormal: {
-    backgroundColor: Palette.normalBg,
-  },
-  stepNumText: {
-    color: Palette.suspicious,
-    ...Type.label2,
-  },
-  stepNumTextNormal: {
-    color: Palette.normal,
-  },
-  stepText: {
-    flex: 1,
-    gap: Space.xs,
-  },
-  stepTitle: {
-    color: Palette.text,
-    ...Type.body1,
-  },
-  stepBody: {
     color: Palette.textMuted,
+    width: Space.lg * 4,
     ...Type.body2,
   },
+  detailValue: {
+    color: Palette.textMuted,
+    flex: 1,
+    ...Type.body1,
+  },
   notice: {
-    backgroundColor: Palette.glassMuted,
-    borderRadius: Radius.button,
-    padding: Space.md,
+    marginTop: Space.md - Space.xs,
+    paddingHorizontal: Space.sm,
   },
   noticeText: {
-    color: Palette.text,
+    color: Palette.textMuted,
+    textAlign: 'center',
     ...Type.caption,
-    opacity: 0.9,
   },
   grow: {
     flex: 1,

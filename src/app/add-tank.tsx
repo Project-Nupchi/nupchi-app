@@ -3,7 +3,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import {
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -15,9 +14,14 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { KeyboardStickyFooter } from '@/components/keyboard-sticky-footer';
+import { ChevronBackButton } from '@/components/chevron-back-button';
 import { FigmaTokens, Gradient, Palette, Radius, Space, Type } from '@/constants/aqua-theme';
 import { AppCopy } from '@/constants/copy';
 import { useAquaculture } from '@/state/aquaculture-store';
+
+const FORM_BUTTON_HEIGHT = 56;
+const KEYBOARD_FOOTER_GAP = Space.md;
 
 type TankFieldProps = Omit<TextInputProps, 'multiline' | 'placeholderTextColor' | 'style'> & {
   label: string;
@@ -29,6 +33,13 @@ type FormButtonProps = {
   label: string;
   onPress: () => void;
   variant: 'primary' | 'secondary';
+};
+
+type FormActionsProps = {
+  isSaving: boolean;
+  onCancel: () => void;
+  onSave: () => void;
+  saveDisabled: boolean;
 };
 
 // Figma의 수조 추가·편집 화면은 같은 폼 구조를 공유하며 editId로 모드를 구분한다.
@@ -50,6 +61,7 @@ export default function TankFormScreen() {
   const title = isEditMode ? AppCopy.navigation.editTank : AppCopy.navigation.addTank;
   const saveDisabled = isSaving || missingEditingTank;
   const footerBottom = Math.max(insets.bottom + Space.md - Space.xxs, Space.lg);
+  const footerReservedSpace = Space.lg + FORM_BUTTON_HEIGHT + footerBottom;
 
   const clearError = () => setError('');
 
@@ -86,104 +98,96 @@ export default function TankFormScreen() {
       />
       <View style={[StyleSheet.absoluteFill, styles.gradientWash]} />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.keyboardAvoiding}
+      <View style={{ height: insets.top }} />
+      <AppBar title={title} />
+
+      <ScrollView
+        automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+        contentInsetAdjustmentBehavior="never"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        style={styles.scroll}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: footerReservedSpace }]}
       >
-        <View style={{ height: insets.top }} />
-        <AppBar title={title} />
+        <View style={styles.form}>
+          <TankField
+            accessibilityState={{ disabled: isEditMode }}
+            autoCapitalize="characters"
+            editable={!isEditMode}
+            label={AppCopy.addTank.tankId}
+            onChangeText={(value) => {
+              setTankId(value);
+              clearError();
+            }}
+            placeholder={AppCopy.addTank.tankIdPlaceholder}
+            returnKeyType="next"
+            value={tankId}
+          />
 
-        <ScrollView
-          contentInsetAdjustmentBehavior="never"
-          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-        >
-          <View style={styles.form}>
-            <TankField
-              accessibilityState={{ disabled: isEditMode }}
-              autoCapitalize="characters"
-              editable={!isEditMode}
-              label={AppCopy.addTank.tankId}
-              onChangeText={(value) => {
-                setTankId(value);
-                clearError();
-              }}
-              placeholder={AppCopy.addTank.tankIdPlaceholder}
-              returnKeyType="next"
-              value={tankId}
-            />
+          <TankField
+            label={AppCopy.addTank.groupId}
+            onChangeText={(value) => {
+              setGroupId(value);
+              clearError();
+            }}
+            placeholder={AppCopy.addTank.groupIdPlaceholder}
+            returnKeyType="next"
+            value={groupId}
+          />
 
-            <TankField
-              label={AppCopy.addTank.groupId}
-              onChangeText={(value) => {
-                setGroupId(value);
-                clearError();
-              }}
-              placeholder={AppCopy.addTank.groupIdPlaceholder}
-              returnKeyType="next"
-              value={groupId}
-            />
+          <TankField
+            label={AppCopy.addTank.stockedInfo}
+            multiline
+            onChangeText={(value) => {
+              setStockedInfo(value);
+              clearError();
+            }}
+            placeholder={AppCopy.addTank.stockedInfoPlaceholder}
+            value={stockedInfo}
+          />
 
-            <TankField
-              label={AppCopy.addTank.stockedInfo}
-              multiline
-              onChangeText={(value) => {
-                setStockedInfo(value);
-                clearError();
-              }}
-              placeholder={AppCopy.addTank.stockedInfoPlaceholder}
-              value={stockedInfo}
-            />
-
-            {isEditMode ? (
-              <View style={styles.activeRow}>
-                <View style={styles.activeCopy}>
-                  <Text selectable style={styles.activeLabel}>
-                    {AppCopy.addTank.active}
-                  </Text>
-                  <Text selectable style={styles.activeHint}>
-                    {AppCopy.addTank.activeHint}
-                  </Text>
-                </View>
-                <TankSwitch
-                  disabled={missingEditingTank}
-                  onChange={(value) => {
-                    setActive(value);
-                    clearError();
-                  }}
-                  value={active}
-                />
+          {isEditMode ? (
+            <View style={styles.activeRow}>
+              <View style={styles.activeCopy}>
+                <Text selectable style={styles.activeLabel}>
+                  {AppCopy.addTank.active}
+                </Text>
+                <Text selectable style={styles.activeHint}>
+                  {AppCopy.addTank.activeHint}
+                </Text>
               </View>
-            ) : null}
+              <TankSwitch
+                disabled={missingEditingTank}
+                onChange={(value) => {
+                  setActive(value);
+                  clearError();
+                }}
+                value={active}
+              />
+            </View>
+          ) : null}
 
-            {error || missingEditingTank ? (
-              <Text accessibilityLiveRegion="polite" selectable style={styles.error}>
-                {error || AppCopy.validation.tankNotFound}
-              </Text>
-            ) : null}
-          </View>
-        </ScrollView>
-
-        <View style={[styles.footer, { paddingBottom: footerBottom }]}>
-          <View style={styles.footerActions}>
-            <FormButton
-              disabled={isSaving}
-              label={AppCopy.common.cancel}
-              onPress={() => router.back()}
-              variant="secondary"
-            />
-            <FormButton
-              disabled={saveDisabled}
-              label={AppCopy.common.save}
-              onPress={save}
-              variant="primary"
-            />
-          </View>
+          {error || missingEditingTank ? (
+            <Text accessibilityLiveRegion="polite" selectable style={styles.error}>
+              {error || AppCopy.validation.tankNotFound}
+            </Text>
+          ) : null}
         </View>
-      </KeyboardAvoidingView>
+      </ScrollView>
+
+      <KeyboardStickyFooter
+        closedBottom={footerBottom}
+        keyboardGap={KEYBOARD_FOOTER_GAP}
+        style={styles.footer}
+      >
+        <FormActions
+          isSaving={isSaving}
+          onCancel={() => router.back()}
+          onSave={save}
+          saveDisabled={saveDisabled}
+        />
+      </KeyboardStickyFooter>
     </View>
   );
 }
@@ -191,17 +195,7 @@ export default function TankFormScreen() {
 function AppBar({ title }: { title: string }) {
   return (
     <View style={styles.appBar}>
-      <Pressable
-        accessibilityLabel={AppCopy.common.back}
-        accessibilityRole="button"
-        hitSlop={8}
-        onPress={() => router.back()}
-        style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-      >
-        <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.backIcon}>
-          <View style={styles.backChevron} />
-        </View>
-      </Pressable>
+      <ChevronBackButton onPress={() => router.back()} />
       <Text selectable style={styles.appBarTitle}>
         {title}
       </Text>
@@ -224,6 +218,25 @@ function TankField({ label, multiline = false, ...inputProps }: TankFieldProps) 
         placeholderTextColor={FigmaTokens.color.gray[300]}
         selectionColor={Palette.primary}
         style={[styles.input, multiline && styles.textArea]}
+      />
+    </View>
+  );
+}
+
+function FormActions({ isSaving, onCancel, onSave, saveDisabled }: FormActionsProps) {
+  return (
+    <View style={styles.footerActions}>
+      <FormButton
+        disabled={isSaving}
+        label={AppCopy.common.cancel}
+        onPress={onCancel}
+        variant="secondary"
+      />
+      <FormButton
+        disabled={saveDisabled}
+        label={AppCopy.common.save}
+        onPress={onSave}
+        variant="primary"
       />
     </View>
   );
@@ -283,9 +296,6 @@ const styles = StyleSheet.create({
     backgroundColor: FigmaTokens.color.white[80],
     pointerEvents: 'none',
   },
-  keyboardAvoiding: {
-    flex: 1,
-  },
   appBar: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -294,41 +304,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.lg,
     position: 'relative',
   },
-  backButton: {
-    alignItems: 'center',
-    height: 28,
-    justifyContent: 'center',
-    width: 28,
-    zIndex: 1,
-  },
-  backIcon: {
-    alignItems: 'center',
-    height: 28,
-    justifyContent: 'center',
-    width: 28,
-  },
-  backChevron: {
-    borderBottomColor: Palette.text,
-    borderBottomWidth: 2,
-    borderLeftColor: Palette.text,
-    borderLeftWidth: 2,
-    height: 10,
-    marginLeft: Space.xs,
-    transform: [{ rotate: '45deg' }],
-    width: 10,
-  },
   appBarTitle: {
     color: FigmaTokens.color.gray[950],
-    left: Space.lg + 28,
+    left: Space.lg + Space.xl,
     pointerEvents: 'none',
     position: 'absolute',
-    right: Space.lg + 28,
+    right: Space.lg + Space.xl,
     textAlign: 'center',
     ...Type.title,
   },
   appBarTrailing: {
-    height: 28,
-    width: 28,
+    height: Space.xl,
+    width: Space.xl,
   },
   scroll: {
     flex: 1,
@@ -412,8 +399,11 @@ const styles = StyleSheet.create({
   },
   footer: {
     alignItems: 'center',
+    left: 0,
     paddingHorizontal: Space.lg,
     paddingTop: Space.lg,
+    position: 'absolute',
+    right: 0,
   },
   footerActions: {
     flexDirection: 'row',
@@ -425,7 +415,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: Radius.button,
     flex: 1,
-    height: 56,
+    height: FORM_BUTTON_HEIGHT,
     justifyContent: 'center',
     overflow: 'hidden',
   },
