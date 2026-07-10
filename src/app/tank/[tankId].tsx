@@ -9,6 +9,7 @@ import { StateChip } from '@/components/state-chip';
 import { StatusBadge } from '@/components/status-badge';
 import { FlounderMark } from '@/components/tank-decor';
 import { Palette, Radius, Space } from '@/constants/aqua-theme';
+import { AppCopy } from '@/constants/copy';
 import {
   formatDateTime,
   getGroupAlertSource,
@@ -32,9 +33,9 @@ export default function TankDetailScreen() {
       <ScreenShell>
         <GlassCard style={styles.panel}>
           <Text selectable style={styles.panelTitle}>
-            수조를 찾을 수 없습니다
+            {AppCopy.tank.notFound}
           </Text>
-          <ActionButton label="홈으로" onPress={() => router.replace('/')} />
+          <ActionButton label={AppCopy.common.home} onPress={() => router.replace('/')} />
         </GlassCard>
       </ScreenShell>
     );
@@ -51,7 +52,7 @@ export default function TankDetailScreen() {
             </Text>
             <Text selectable style={styles.tankMeta}>
               {tank.groupId}
-              {tank.active ? '' : ' · 비활성'}
+              {tank.active ? '' : AppCopy.tank.inactive}
             </Text>
           </View>
           <FlounderMark width={96} showLesion={status === 'suspicious'} />
@@ -63,19 +64,19 @@ export default function TankDetailScreen() {
           <StatusBadge status={status} />
           {linkedSource && status !== 'suspicious' ? (
             <Text selectable style={styles.linked}>
-              {linkedSource.id} 계통 주의
+              {AppCopy.tank.linkedWarning(linkedSource.id)}
             </Text>
           ) : null}
         </View>
         <View style={styles.headerActions}>
           <ActionButton
-            label="이 수조 촬영"
+            label={AppCopy.tank.captureThis}
             icon="camera.fill"
             onPress={() => router.push({ pathname: '/camera', params: { tankId: tank.id } })}
             style={styles.grow}
           />
           <ActionButton
-            label="편집"
+            label={AppCopy.tank.edit}
             icon="pencil"
             variant="secondary"
             size="compact"
@@ -86,13 +87,13 @@ export default function TankDetailScreen() {
 
       {/* 점검 내역 */}
       <Text selectable style={styles.sectionTitle}>
-        점검 내역 {tankResults.length > 0 ? tankResults.length : ''}
+        {AppCopy.tank.history} {tankResults.length > 0 ? tankResults.length : ''}
       </Text>
 
       {tankResults.length === 0 ? (
         <GlassCard style={styles.empty}>
           <Text selectable style={styles.emptyBody}>
-            아직 점검 기록이 없어요. 이 수조를 촬영하면 분석 결과가 카드로 쌓입니다.
+            {AppCopy.tank.emptyHistory}
           </Text>
         </GlassCard>
       ) : (
@@ -110,7 +111,7 @@ export default function TankDetailScreen() {
                     {formatDateTime(result.capturedAt)}
                   </Text>
                   {result.status === 'completed' ? (
-                    <StatusBadge status={result.grade} compact />
+                    <StatusBadge status={result.grade} compact binary />
                   ) : (
                     <StateChip status={result.status} />
                   )}
@@ -119,7 +120,7 @@ export default function TankDetailScreen() {
                   {result.status === 'completed'
                     ? result.evidenceSummary
                     : result.status === 'pending'
-                      ? 'AI 분석 결과를 기다리는 중이에요.'
+                      ? AppCopy.tank.pendingSummary
                       : result.evidenceSummary}
                 </Text>
                 {result.status === 'completed' && result.diseases.length > 0 ? (
@@ -191,10 +192,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sectionTitle: {
-    color: Palette.onGradient,
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: -0.3,
+    color: 'rgba(20, 23, 30, 0.8)',
+    fontSize: 18,
+    fontWeight: '600',
+    letterSpacing: -0.36,
     marginLeft: 4,
     marginTop: Space.sm,
   },

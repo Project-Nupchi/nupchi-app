@@ -1,28 +1,30 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo } from 'react';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View, ViewStyle, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Palette, Radius, Shadow, Space } from '@/constants/aqua-theme';
+import { Gradient, Palette, Radius, Shadow, Space, Type, Water } from '@/constants/aqua-theme';
+import { AppCopy, StatusCopy } from '@/constants/copy';
 import { TankStatus, getTankGroupStatus, sortTanksByRisk, statusLabel } from '@/domain/aquaculture';
 import { useAquaculture } from '@/state/aquaculture-store';
 
-// Figma 홈 디자인 에셋 (넙치 일러스트 · 물결 링 · 상태/탭 아이콘)
+// Figma 홈 디자인 에셋 (넙치 일러스트 · 상태/탭 아이콘)
+// SVG 원본은 CSS 변수·blur 필터를 포함해 네이티브에서 렌더링되지 않으므로 PNG(3x)를 사용
 const flounderImg = require('../../assets/images/home/flounder.png');
-const rippleImg = require('../../assets/images/home/ripple.svg');
-const mapPinImg = require('../../assets/images/home/map-pin.svg');
-const chevronBlueImg = require('../../assets/images/home/chevron-blue.svg');
-const chevronDarkImg = require('../../assets/images/home/chevron-dark.svg');
-const cameraImg = require('../../assets/images/home/camera.svg');
-const tabHomeImg = require('../../assets/images/home/tab-home.svg');
-const tabListImg = require('../../assets/images/home/tab-list.svg');
+const flounderWarnImg = require('../../assets/images/home/flounder-warn.png');
+const mapPinImg = require('../../assets/images/home/map-pin.png');
+const chevronBlueImg = require('../../assets/images/home/chevron-blue.png');
+const chevronDarkImg = require('../../assets/images/home/chevron-dark.png');
+const cameraImg = require('../../assets/images/home/camera.png');
+const tabHomeImg = require('../../assets/images/home/tab-home.png');
+const tabListImg = require('../../assets/images/home/tab-list.png');
 
 const statusIcons: Record<TankStatus, number> = {
-  suspicious: require('../../assets/images/home/status-warn.svg'),
-  caution: require('../../assets/images/home/status-suspect.svg'),
-  normal: require('../../assets/images/home/status-good.svg'),
+  suspicious: require('../../assets/images/home/status-warn.png'),
+  caution: require('../../assets/images/home/status-suspect.png'),
+  normal: require('../../assets/images/home/status-good.png'),
 };
 
 // 웹 전용 프로스티드 블러 (네이티브는 반투명 배경으로 대체)
@@ -35,8 +37,6 @@ export default function HomeScreen() {
   const { session, tanks, results } = useAquaculture();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const scrollRef = useRef<ScrollView>(null);
-  const [tanksSectionY, setTanksSectionY] = useState(0);
 
   const sorted = useMemo(() => sortTanksByRisk(tanks, results), [results, tanks]);
   const counts = { normal: 0, caution: 0, suspicious: 0 };
@@ -45,29 +45,29 @@ export default function HomeScreen() {
   // 헤드라인: 가장 높은 위험 단계 기준
   const headline =
     counts.suspicious > 0
-      ? { grade: '경고', count: counts.suspicious }
+      ? { grade: StatusCopy.suspicious, count: counts.suspicious }
       : counts.caution > 0
-        ? { grade: '의심', count: counts.caution }
+        ? { grade: StatusCopy.caution, count: counts.caution }
         : null;
 
   const worstTankId = sorted[0]?.id;
 
   // 반응형: 히어로 넙치는 화면 폭 비례(상한), 콘텐츠는 최대 폭 제한
   const flounderSize = Math.min(width * 0.68, 300);
-  const rippleSize = flounderSize * 1.72;
+  const rippleSize = flounderSize * (455 / 265);
+  const heroFlounderImg = headline?.grade === StatusCopy.suspicious ? flounderWarnImg : flounderImg;
   // 카드 가로 스크롤을 중앙 컨테이너(최대 520)와 좌측 정렬
   const cardInset = Math.max((width - 520) / 2, 0) + Space.lg;
 
   return (
     <View style={styles.root}>
       <LinearGradient
-        colors={['#4B9AE9', '#78B3EF', '#A5CCF4', '#D2E6FA', '#FFFFFF']}
-        locations={[0, 0.2, 0.4, 0.62, 0.88]}
+        colors={[...Gradient.colors]}
+        locations={[...Gradient.locations]}
         style={StyleSheet.absoluteFill}
       />
 
       <ScrollView
-        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scroll, { paddingTop: insets.top + Space.md, paddingBottom: insets.bottom + 140 }]}
       >
@@ -83,16 +83,15 @@ export default function HomeScreen() {
           {/* 헤드라인 + CTA */}
           <View style={styles.headlineBlock}>
             <Text selectable style={styles.headlineSub}>
-              오늘의 수조 상태
+              {AppCopy.home.todayStatus}
             </Text>
             {headline ? (
               <Text selectable style={styles.headline}>
-                {headline.grade} 단계의 수조가{'\n'}
-                {headline.count}개 발견됐어요
+                {AppCopy.home.alertHeadline(headline.grade, headline.count)}
               </Text>
             ) : (
               <Text selectable style={styles.headline}>
-                모든 수조가{'\n'}양호한 상태예요
+                {AppCopy.home.allNormal}
               </Text>
             )}
             <Pressable
@@ -102,31 +101,23 @@ export default function HomeScreen() {
               style={({ pressed }) => [styles.cta, pressed && styles.pressed]}
             >
               <Text selectable={false} style={styles.ctaText}>
-                수조 바로 확인하기
+                {AppCopy.home.inspectNow}
               </Text>
               <Image source={chevronBlueImg} style={styles.ctaIcon} contentFit="contain" />
             </Pressable>
           </View>
 
           {/* 히어로: 물결 링 + 넙치 일러스트 */}
-          <View style={[styles.hero, { height: flounderSize * 0.94 }]}>
-            <Image
-              source={rippleImg}
-              style={[styles.ripple, { width: rippleSize, height: rippleSize }]}
-              contentFit="contain"
-            />
-            <Image
-              source={flounderImg}
-              style={{ width: flounderSize, height: flounderSize }}
-              contentFit="contain"
-            />
+          <View style={[styles.hero, { height: flounderSize * 0.86 }]}>
+            <WarningRipple size={rippleSize} />
+            <Image source={heroFlounderImg} style={[styles.flounder, { height: flounderSize, width: flounderSize }]} contentFit="contain" />
           </View>
 
           {/* 수조 현황 */}
-          <View style={styles.tanksSection} onLayout={(e) => setTanksSectionY(e.nativeEvent.layout.y)}>
+          <View style={styles.tanksSection}>
             <View style={styles.sectionHeader}>
               <Text selectable style={styles.sectionTitle}>
-                수조 현황
+                {AppCopy.navigation.tankStatus}
               </Text>
               <Image source={chevronDarkImg} style={styles.sectionChevron} contentFit="contain" />
             </View>
@@ -137,6 +128,7 @@ export default function HomeScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.cardScroller}
           contentContainerStyle={[styles.cardRow, { paddingHorizontal: cardInset }]}
         >
           {sorted.map((tank) => {
@@ -160,47 +152,32 @@ export default function HomeScreen() {
               </Pressable>
             );
           })}
-          {/* 수조 추가 */}
-          <Pressable
-            accessibilityLabel="수조 추가"
-            accessibilityRole="button"
-            onPress={() => router.push('/add-tank')}
-            style={({ pressed }) => [styles.card, styles.addCard, pressed && styles.pressed]}
-          >
-            <View style={styles.addPlus}>
-              <View style={styles.addPlusH} />
-              <View style={styles.addPlusV} />
-            </View>
-            <Text selectable={false} style={styles.addLabel}>
-              추가
-            </Text>
-          </Pressable>
         </ScrollView>
       </ScrollView>
 
       {/* 하단 탭바 (다크 글래스) */}
       <View style={[styles.tabBar, webBlur, { bottom: insets.bottom + Space.lg }]}>
         <Pressable accessibilityRole="button" style={[styles.tabItem, styles.tabItemActive]}>
-          <Image source={tabHomeImg} style={styles.tabIcon} contentFit="contain" />
+          <Image source={tabHomeImg} style={[styles.tabIcon, styles.tabIconActive]} contentFit="contain" />
           <Text selectable={false} style={styles.tabLabelActive}>
-            홈
+            {AppCopy.navigation.home}
           </Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          onPress={() => scrollRef.current?.scrollTo({ y: Math.max(tanksSectionY - 80, 0), animated: true })}
+          onPress={() => router.push('/tank-status')}
           style={styles.tabItem}
         >
-          <Image source={tabListImg} style={styles.tabIcon} contentFit="contain" />
+          <Image source={tabListImg} style={[styles.tabIcon, styles.tabIconInactive]} contentFit="contain" />
           <Text selectable={false} style={styles.tabLabel}>
-            수조 현황
+            {AppCopy.navigation.tankStatus}
           </Text>
         </Pressable>
       </View>
 
       {/* 카메라 FAB (다크 글래스) */}
       <Pressable
-        accessibilityLabel="촬영"
+        accessibilityLabel={AppCopy.navigation.capture}
         accessibilityRole="button"
         onPress={() => router.push('/camera')}
         style={({ pressed }) => [styles.fab, webBlur, { bottom: insets.bottom + Space.lg }, pressed && styles.fabPressed]}
@@ -211,22 +188,23 @@ export default function HomeScreen() {
   );
 }
 
-const GLASS_DARK = 'rgba(30, 42, 69, 0.7)';
-const CARD_SHADOW = {
-  shadowColor: '#0B2740',
-  shadowOffset: { width: 0, height: 8 },
-  shadowOpacity: 0.1,
-  shadowRadius: 20,
-  elevation: 4,
-} satisfies ViewStyle;
+function WarningRipple({ size }: { size: number }) {
+  return (
+    <View style={[styles.ripple, { height: size, pointerEvents: 'none', width: size }]}>
+      <View style={[styles.rippleCircle, styles.rippleOuter]} />
+      <View style={[styles.rippleCircle, styles.rippleMiddle]} />
+      <View style={[styles.rippleCircle, styles.rippleInner]} />
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   root: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Palette.canvas,
     flex: 1,
   },
   scroll: {
-    gap: Space.lg,
+    gap: 0,
   },
   container: {
     alignSelf: 'center',
@@ -247,44 +225,37 @@ const styles = StyleSheet.create({
   },
   locationText: {
     color: Palette.white,
-    fontSize: 20,
-    fontWeight: '600',
-    letterSpacing: -0.4,
+    ...Type.title,
   },
   headlineBlock: {
     alignItems: 'flex-start',
     gap: Space.md,
     marginTop: Space.xs,
+    position: 'relative',
+    zIndex: 3,
   },
   headlineSub: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 18,
-    fontWeight: '600',
-    letterSpacing: -0.36,
+    color: Palette.onGradientMuted,
+    ...Type.heading2,
   },
   headline: {
     color: Palette.white,
-    fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: -0.84,
-    lineHeight: 39,
+    ...Type.display,
   },
   cta: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 40,
+    backgroundColor: Palette.glassStrong,
+    borderRadius: Radius.roundButton,
     flexDirection: 'row',
-    gap: 2,
+    gap: Space.xxs,
     height: 48,
     justifyContent: 'center',
-    paddingHorizontal: 16,
-    ...CARD_SHADOW,
+    paddingHorizontal: Space.md,
+    ...Shadow.card,
   },
   ctaText: {
-    color: '#3689DD',
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: -0.32,
+    color: Palette.primary,
+    ...Type.button,
   },
   ctaIcon: {
     height: 16,
@@ -293,13 +264,49 @@ const styles = StyleSheet.create({
   hero: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: Space.xs,
+    marginVertical: 0,
+    overflow: 'visible',
+    position: 'relative',
+    zIndex: 1,
+  },
+  flounder: {
+    zIndex: 2,
   },
   ripple: {
+    alignItems: 'center',
+    justifyContent: 'center',
     position: 'absolute',
+    zIndex: 1,
+  },
+  rippleCircle: {
+    borderColor: Palette.onGradientTrace,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    position: 'absolute',
+  },
+  rippleOuter: {
+    backgroundColor: Water.lesionGlowOuter,
+    height: '100%',
+    width: '100%',
+  },
+  rippleMiddle: {
+    backgroundColor: Water.lesionGlowInner,
+    height: '81%',
+    width: '81%',
+  },
+  rippleInner: {
+    backgroundColor: Water.lesionGlowInner,
+    height: '60%',
+    width: '60%',
   },
   tanksSection: {
     gap: Space.md,
+    position: 'relative',
+    zIndex: 3,
+  },
+  cardScroller: {
+    position: 'relative',
+    zIndex: 3,
   },
   sectionHeader: {
     alignItems: 'center',
@@ -307,35 +314,34 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   sectionTitle: {
-    color: 'rgba(20, 23, 30, 0.8)',
-    fontSize: 18,
-    fontWeight: '600',
-    letterSpacing: -0.36,
+    color: Palette.textMuted,
+    ...Type.heading2,
   },
   sectionChevron: {
     height: 20,
     width: 20,
   },
   cardRow: {
-    gap: 8,
+    backgroundColor: 'transparent',
+    gap: Space.sm,
+    paddingBottom: Space.xl,
+    paddingTop: Space.sm,
   },
   card: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    borderColor: 'rgba(255, 255, 255, 0.8)',
-    borderRadius: 20,
+    backgroundColor: Palette.glass,
+    borderColor: Palette.glassLine,
+    borderRadius: Radius.card,
     borderWidth: 1,
     gap: 6,
     minWidth: 94,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    ...CARD_SHADOW,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
+    ...Shadow.card,
   },
   cardId: {
-    color: 'rgba(20, 23, 30, 0.7)',
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: -0.32,
+    color: Palette.textMuted,
+    ...Type.body1,
   },
   cardStatusRow: {
     alignItems: 'center',
@@ -347,44 +353,14 @@ const styles = StyleSheet.create({
     width: 15,
   },
   cardStatusText: {
-    color: 'rgba(20, 23, 30, 0.9)',
-    fontSize: 14,
-    fontWeight: '500',
-    letterSpacing: -0.28,
-  },
-  addCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.45)',
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-  },
-  addPlus: {
-    alignItems: 'center',
-    height: 22,
-    justifyContent: 'center',
-    width: 22,
-  },
-  addPlusH: {
-    backgroundColor: 'rgba(20, 23, 30, 0.55)',
-    borderRadius: 2,
-    height: 2.5,
-    position: 'absolute',
-    width: 16,
-  },
-  addPlusV: {
-    backgroundColor: 'rgba(20, 23, 30, 0.55)',
-    borderRadius: 2,
-    height: 16,
-    position: 'absolute',
-    width: 2.5,
-  },
-  addLabel: {
-    color: 'rgba(20, 23, 30, 0.7)',
-    fontSize: 14,
-    fontWeight: '500',
+    color: Palette.text,
+    ...Type.label1,
   },
   tabBar: {
     alignItems: 'center',
-    backgroundColor: GLASS_DARK,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderColor: 'rgba(255, 255, 255, 0.8)',
+    borderWidth: 1,
     borderRadius: Radius.pill,
     flexDirection: 'row',
     gap: 4,
@@ -403,27 +379,31 @@ const styles = StyleSheet.create({
     width: 80,
   },
   tabItemActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: Palette.white,
   },
   tabIcon: {
     height: 24,
     width: 24,
   },
+  tabIconActive: {
+    tintColor: Palette.ink,
+  },
+  tabIconInactive: {
+    tintColor: Palette.textSubtle,
+  },
   tabLabelActive: {
-    color: Palette.white,
-    fontSize: 11,
-    fontWeight: '500',
-    letterSpacing: -0.22,
+    color: Palette.ink,
+    ...Type.label3,
   },
   tabLabel: {
-    color: 'rgba(255, 255, 255, 0.5)',
-    fontSize: 11,
-    fontWeight: '500',
-    letterSpacing: -0.22,
+    color: Palette.textSubtle,
+    ...Type.label3,
   },
   fab: {
     alignItems: 'center',
-    backgroundColor: GLASS_DARK,
+    backgroundColor: Palette.inkOverlay,
+    borderColor: Palette.white,
+    borderWidth: 1,
     borderRadius: Radius.pill,
     height: 64,
     justifyContent: 'center',
@@ -434,6 +414,7 @@ const styles = StyleSheet.create({
   },
   fabIcon: {
     height: 28,
+    tintColor: Palette.white,
     width: 28,
   },
   fabPressed: {

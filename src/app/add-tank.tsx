@@ -1,15 +1,17 @@
 import { useState } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
 import { KeyboardAvoidingView, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { ActionButton } from '@/components/action-button';
-import { Palette, Radius, Space } from '@/constants/aqua-theme';
+import { Gradient, Palette, Radius, Shadow, Space } from '@/constants/aqua-theme';
+import { AppCopy } from '@/constants/copy';
 import { useAquaculture } from '@/state/aquaculture-store';
 
 // 수조 추가·편집 (editId 있으면 편집)
 export default function AddTankSheet() {
   const { editId } = useLocalSearchParams<{ editId?: string }>();
-  const { tanks, addTank, updateTank, setTankActive } = useAquaculture();
+  const { tanks, addTank, updateTank } = useAquaculture();
   const editing = tanks.find((tank) => tank.id === editId);
 
   const [tankId, setTankId] = useState(editing?.id ?? '');
@@ -17,26 +19,35 @@ export default function AddTankSheet() {
   const [stockedInfo, setStockedInfo] = useState(editing?.stockedInfo ?? '');
   const [active, setActive] = useState(editing?.active ?? true);
   const [error, setError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
-  const save = () => {
+  const save = async () => {
+    setIsSaving(true);
+    setError('');
     if (editing) {
-      const res = updateTank(editing.id, groupId, stockedInfo);
-      if (!res.ok) return setError(res.message);
-      if (active !== editing.active) setTankActive(editing.id, active);
+      const res = await updateTank(editing.id, groupId, stockedInfo, active);
+      if (!res.ok) {
+        setIsSaving(false);
+        return setError(res.message);
+      }
       router.back();
       return;
     }
-    const res = addTank(tankId, groupId, stockedInfo);
-    if (!res.ok) return setError(res.message);
+    const res = await addTank(tankId, groupId, stockedInfo);
+    if (!res.ok) {
+      setIsSaving(false);
+      return setError(res.message);
+    }
     router.back();
   };
 
   return (
     <KeyboardAvoidingView behavior="padding" style={styles.root}>
+      <LinearGradient colors={[...Gradient.colors]} locations={[...Gradient.locations]} style={StyleSheet.absoluteFill} />
       <View style={styles.content}>
         <View style={styles.field}>
           <Text selectable style={styles.label}>
-            수조 ID
+            {AppCopy.addTank.tankId}
           </Text>
           <TextInput
             autoCapitalize="characters"
@@ -46,7 +57,7 @@ export default function AddTankSheet() {
               setTankId(v);
               setError('');
             }}
-            placeholder="예: D-02"
+            placeholder={AppCopy.addTank.tankIdPlaceholder}
             placeholderTextColor={Palette.textSubtle}
             style={[styles.input, Boolean(editing) && styles.inputLocked]}
             value={tankId}
@@ -55,11 +66,11 @@ export default function AddTankSheet() {
 
         <View style={styles.field}>
           <Text selectable style={styles.label}>
-            수조군 (취수·배수 계통)
+            {AppCopy.addTank.groupId}
           </Text>
           <TextInput
             onChangeText={setGroupId}
-            placeholder="예: 1계통"
+            placeholder={AppCopy.addTank.groupIdPlaceholder}
             placeholderTextColor={Palette.textSubtle}
             style={styles.input}
             value={groupId}
@@ -68,12 +79,12 @@ export default function AddTankSheet() {
 
         <View style={styles.field}>
           <Text selectable style={styles.label}>
-            입식 정보
+            {AppCopy.addTank.stockedInfo}
           </Text>
           <TextInput
             multiline
             onChangeText={setStockedInfo}
-            placeholder="입식일 · 마릿수 · 크기 등"
+            placeholder={AppCopy.addTank.stockedInfoPlaceholder}
             placeholderTextColor={Palette.textSubtle}
             style={[styles.input, styles.textArea]}
             value={stockedInfo}
@@ -84,10 +95,10 @@ export default function AddTankSheet() {
           <Pressable style={styles.activeRow} onPress={() => setActive((p) => !p)}>
             <View style={styles.activeText}>
               <Text selectable style={styles.activeLabel}>
-                수조 활성
+                {AppCopy.addTank.active}
               </Text>
               <Text selectable style={styles.hint}>
-                출하 완료 시 비활성 처리합니다. 이력은 보존됩니다.
+                {AppCopy.addTank.activeHint}
               </Text>
             </View>
             <Switch value={active} onValueChange={setActive} trackColor={{ true: Palette.primary, false: '#C9D4DD' }} thumbColor={Palette.white} />
@@ -102,8 +113,8 @@ export default function AddTankSheet() {
       </View>
 
       <View style={styles.footer}>
-        <ActionButton label="취소" variant="secondary" onPress={() => router.back()} style={styles.grow} />
-        <ActionButton label="저장" icon="checkmark" onPress={save} style={styles.grow} />
+        <ActionButton label={AppCopy.common.cancel} variant="secondary" disabled={isSaving} onPress={() => router.back()} style={styles.grow} />
+        <ActionButton label={AppCopy.common.save} icon="checkmark" disabled={isSaving} onPress={save} style={styles.grow} />
       </View>
     </KeyboardAvoidingView>
   );
@@ -130,8 +141,8 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   input: {
-    backgroundColor: Palette.surface,
-    borderColor: Palette.glassHairline,
+    backgroundColor: Palette.glassStrong,
+    borderColor: Palette.glassLine,
     borderRadius: Radius.input,
     borderWidth: 1,
     color: Palette.text,
@@ -139,9 +150,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     minHeight: 54,
     paddingHorizontal: 16,
+    ...Shadow.card,
   },
   inputLocked: {
-    backgroundColor: 'rgba(18, 49, 76, 0.05)',
+    backgroundColor: 'rgba(255, 255, 255, 0.55)',
     color: Palette.textMuted,
   },
   textArea: {
@@ -156,13 +168,14 @@ const styles = StyleSheet.create({
   },
   activeRow: {
     alignItems: 'center',
-    backgroundColor: Palette.surface,
-    borderColor: Palette.glassHairline,
+    backgroundColor: Palette.glassStrong,
+    borderColor: Palette.glassLine,
     borderRadius: Radius.card,
     borderWidth: 1,
     flexDirection: 'row',
     gap: Space.md,
     padding: Space.md,
+    ...Shadow.card,
   },
   activeText: {
     flex: 1,

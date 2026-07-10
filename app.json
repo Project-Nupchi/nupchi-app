@@ -10,8 +10,11 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "infoPlist": {
-        "NSCameraUsageDescription": "수조 점검용 어류 사진을 촬영하기 위해 카메라 접근이 필요합니다."
-      }
+        "NSCameraUsageDescription": "수조 점검용 어류 사진을 촬영하기 위해 카메라 접근이 필요합니다.",
+        "NSPhotoLibraryUsageDescription": "수조 점검용 어류 사진을 선택하기 위해 사진 보관함 접근이 필요합니다."
+      },
+      "bundleIdentifier": "com.elaus.project-nupchi",
+      "appleTeamId": "9T3ZYD7RJF"
     },
     "android": {
       "adaptiveIcon": {
@@ -20,7 +23,11 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -40,6 +47,14 @@
         "expo-camera",
         {
           "cameraPermission": "수조 점검용 어류 사진을 촬영하기 위해 카메라 접근이 필요합니다."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "수조 점검용 어류 사진을 선택하기 위해 사진 보관함 접근이 필요합니다.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ]
     ],

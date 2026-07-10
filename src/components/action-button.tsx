@@ -15,7 +15,7 @@ type ActionButtonProps = {
 
 const textColors = {
   primary: Palette.onPrimary,
-  secondary: Palette.text,
+  secondary: '#1E2A45',
   danger: Palette.white,
   ghost: Palette.primary,
 } as const;
@@ -76,9 +76,10 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.primary,
   },
   secondary: {
-    backgroundColor: Palette.glassStrong,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderColor: Palette.glassLine,
     borderWidth: 1,
+    ...Shadow.card,
   },
   danger: {
     backgroundColor: Palette.suspicious,

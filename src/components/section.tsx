@@ -32,12 +32,11 @@ const styles = StyleSheet.create({
     gap: Space.sm,
   },
   title: {
-    color: Palette.onGradient,
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.6,
+    color: 'rgba(20, 23, 30, 0.8)',
+    fontSize: 18,
+    fontWeight: '600',
+    letterSpacing: -0.36,
     marginLeft: 4,
-    textTransform: 'uppercase',
   },
   body: {
     gap: Space.md,
