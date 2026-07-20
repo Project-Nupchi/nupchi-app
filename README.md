@@ -7,6 +7,8 @@
 > 제주 바이오 AX 해커톤 MVP. AI 진단은 **참고치**이며 확진이 아닙니다. 최종 판단과 조치는
 > 관리자·수의사의 책임입니다.
 
+<img width="1206" height="678" alt="IMG_0524" src="https://github.com/user-attachments/assets/877e9a0b-2958-4e8d-bff9-878b909cd7a5" />
+
 ---
 
 ## 목차
